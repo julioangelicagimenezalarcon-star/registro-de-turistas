@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#12312B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Registro de Turistas">
+<title>Registro de Turistas — Cobquecura</title>
+<link rel="icon" type="image/jpeg" href="assets/logo-cobquecura.jpg">
+<link rel="apple-touch-icon" href="assets/logo-cobquecura.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <img class="login-logo" src="assets/logo-cobquecura.jpg" alt="Escudo I. Municipalidad de Cobquecura">
+    <h1>Registro de Turistas</h1>
+    <p class="login-sub">I. Municipalidad de Cobquecura — Acceso de informadores</p>
+    <div class="field">
+      <label for="login-user">Selecciona tu nombre</label>
+      <select id="login-user"></select>
+    </div>
+    <button type="button" class="stamp-btn" id="login-btn">Ingresar</button>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app-wrap">
+
+  <div class="masthead">
+    <div class="title-block">
+      <h1>Registro de Turistas</h1>
+      <p>I. Municipalidad de Cobquecura — La Costa de Ñuble</p>
+    </div>
+    <div class="masthead-right">
+      <div class="compass"><img src="assets/logo-cobquecura.jpg" alt="Escudo I. Municipalidad de Cobquecura"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="registrar">Registrar</button>
+    <button class="tab-btn" data-tab="panel">Panel</button>
+    <button class="tab-btn" data-tab="historial">Historial</button>
+  </div>
+
+  <!-- REGISTRAR -->
+  <div class="panel active" id="panel-registrar">
+    <div class="card">
+      <h2 class="section-title">Registro Perfil de Turistas</h2>
+      <p class="section-sub">Completa los datos del grupo o visitante atendido. Los campos se guardan al presionar "Sellar registro".</p>
+
+      <div class="grid3">
+        <div class="field">
+          <label for="f-informador">Informador (opcional)</label>
+          <input type="text" id="f-informador" placeholder="Nombre de quien registra">
+        </div>
+        <div class="field">
+          <label for="f-fecha">Fecha</label>
+          <input type="date" id="f-fecha">
+        </div>
+        <div class="field">
+          <label for="f-pais">País</label>
+          <select id="f-pais"></select>
+        </div>
+      </div>
+
+      <div class="grid2" id="chile-subdivision-block">
+        <div class="field">
+          <label for="f-region">Región</label>
+          <select id="f-region"></select>
+        </div>
+        <div class="field">
+          <label for="f-comuna">Comuna</label>
+          <select id="f-comuna"></select>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label for="f-total">Total de turistas del grupo</label>
+        <select id="f-total"></select>
+      </div>
+
+      <hr class="divider">
+
+      <label>Subdivisión por sexo</label>
+      <div class="grid2">
+        <div class="field">
+          <label for="f-fem">Femenino</label>
+          <select id="f-fem"></select>
+        </div>
+        <div class="field">
+          <label for="f-masc">Masculino</label>
+          <select id="f-masc"></select>
+        </div>
+      </div>
+      <div class="sum-hint" id="total-hint">Selecciona el total del grupo arriba.</div>
+
+      <hr class="divider">
+
+      <label>Subdivisión por rango de edad</label>
+      <div class="grid3">
+        <div class="field"><label for="f-e1">Menor de 18</label><select id="f-e1"></select></div>
+        <div class="field"><label for="f-e2">18 – 29</label><select id="f-e2"></select></div>
+        <div class="field"><label for="f-e3">30 – 40</label><select id="f-e3"></select></div>
+        <div class="field"><label for="f-e4">41 – 50</label><select id="f-e4"></select></div>
+        <div class="field"><label for="f-e5">Mayor de 50</label><select id="f-e5"></select></div>
+      </div>
+      <div class="sum-hint" id="edad-hint">Suma de edades: 0</div>
+
+      <hr class="divider">
+
+      <div class="field">
+        <label for="f-motivo">Motivo del viaje</label>
+        <select id="f-motivo">
+          <option value="Ocio / vacaciones">Ocio / vacaciones</option>
+          <option value="Surf">Surf</option>
+          <option value="Negocios">Negocios</option>
+          <option value="Salud / bienestar">Salud / bienestar</option>
+          <option value="Estudios">Estudios</option>
+          <option value="Visita a familiares o amigos">Visita a familiares o amigos</option>
+          <option value="Evento / convención">Evento / convención</option>
+          <option value="Otro">Otro</option>
+        </select>
+        <input type="text" id="f-motivo-otro" class="hidden" placeholder="Especifica el motivo…" style="margin-top:8px;">
+      </div>
+
+      <hr class="divider">
+
+      <label>Atractivos turísticos consultados <span style="text-transform:none; font-weight:400; color:var(--muted);">(puedes seleccionar varios)</span></label>
+      <div class="dropdown-multiselect" id="atractivos-dropdown">
+        <button type="button" class="dropdown-toggle" id="atractivos-toggle">Selecciona atractivos…</button>
+        <div class="dropdown-panel" id="atractivos-panel"></div>
+      </div>
+      <div class="chip-add">
+        <input type="text" id="atractivo-new" placeholder="Agregar otro(s), separados por coma…">
+        <button type="button" id="atractivo-add-btn">Añadir</button>
+      </div>
+
+      <hr class="divider">
+
+      <label>Servicios turísticos consultados <span style="text-transform:none; font-weight:400; color:var(--muted);">(puedes seleccionar varios)</span></label>
+
+      <div class="dropdown-multiselect" id="alojamiento-dropdown">
+        <button type="button" class="dropdown-toggle" id="alojamiento-toggle">Alojamiento…</button>
+        <div class="dropdown-panel" id="alojamiento-panel"></div>
+      </div>
+
+      <div class="dropdown-multiselect" id="transporte-dropdown">
+        <button type="button" class="dropdown-toggle" id="transporte-toggle">Transporte…</button>
+        <div class="dropdown-panel" id="transporte-panel"></div>
+      </div>
+
+      <div class="chip-grid" id="servicios-chips"></div>
+      <div class="chip-add">
+        <input type="text" id="servicio-new" placeholder="Agregar otro(s), separados por coma…">
+        <button type="button" id="servicio-add-btn">Añadir</button>
+      </div>
+
+      <div class="stamp-row">
+        <span class="stamp-msg" id="stamp-msg">Registro guardado</span>
+        <button class="stamp-btn" id="save-btn">Sellar registro</button>
+      </div>
+    </div>
+    <p class="shared-note">Esta bitácora es compartida: todos los informadores que usen este enlace ven y añaden a los mismos registros.</p>
+  </div>
+
+  <!-- PANEL -->
+  <div class="panel" id="panel-panel">
+    <div class="card" id="panel-content">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="panel" id="panel-historial">
+    <div class="card">
+      <div class="toolbar">
+        <h2 class="section-title" style="margin:0;">Historial de registros</h2>
+        <div style="display:flex; gap:8px;">
+          <button class="toolbar-btn" id="export-btn">Exportar CSV</button>
+          <button class="toolbar-btn" id="export-xlsx-btn" style="border-color:var(--ink-2); color:var(--ink-2); font-weight:600;">Exportar Base de Datos (Excel)</button>
+        </div>
+      </div>
+      <div id="historial-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
