@@ -1011,8 +1011,18 @@
   }
   function escapeAttr(str){ return escapeHtml(str); }
 
+  async function hasExistingData(){
+    try{
+      const res = await window.__storageAdapter.get(STORAGE_KEY, true);
+      return !!(res && res.value);
+    }catch(e){
+      return false;
+    }
+  }
+
   async function bootstrap(){
-    if(new URLSearchParams(location.search).get('seed') === '1'){
+    const forceSeed = new URLSearchParams(location.search).get('seed') === '1';
+    if(forceSeed || !(await hasExistingData())){
       try{
         const res = await fetch('seed-data.json');
         const seed = await res.json();
