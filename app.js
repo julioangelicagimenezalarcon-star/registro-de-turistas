@@ -159,6 +159,13 @@
   }
   $("f-fecha").value = todayStr();
 
+  // "YYYY-MM-DD" parsed as a LOCAL date (avoids the off-by-one day shift that
+  // `new Date("YYYY-MM-DD")` causes when the browser timezone is behind UTC).
+  function parseLocalDate(str){
+    const [y,m,d] = String(str).split("-").map(Number);
+    return new Date(y, (m||1)-1, d||1);
+  }
+
   // ---------- Login ----------
   const PERSONAL = ["Angélica Alarcón"]; // Lista de personal habilitado para iniciar sesión — agregar más nombres aquí
 
@@ -519,6 +526,7 @@
   if(hasChart){
     Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
     Chart.defaults.color = "#22201B";
+    Chart.defaults.animation = { duration: 850, easing: "easeOutQuart" };
   } else {
     console.error("[Registro de Turistas] Chart.js no cargó (CDN). Los gráficos del Panel no se mostrarán, pero el resto de la app funciona con normalidad.");
   }
@@ -532,6 +540,56 @@
     if(chartInstances[id]){ chartInstances[id].destroy(); delete chartInstances[id]; }
   }
 
+  // Animated count-up for hero stat numbers — gives the dashboard a "live data" feel.
+  function animateCount(el, endVal, opts){
+    const isPct = !!(opts && opts.suffix === "%");
+    const decimals = isPct ? 1 : 0;
+    const duration = 900;
+    const start = performance.now();
+    function frame(now){
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const val = endVal * eased;
+      el.textContent = val.toLocaleString('es-CL', {minimumFractionDigits:decimals, maximumFractionDigits:decimals}) + (opts && opts.suffix ? opts.suffix : "");
+      if(t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function makeGradient(ctx, area, colorTop, colorBottom){
+    const g = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    g.addColorStop(0, colorTop);
+    g.addColorStop(1, colorBottom);
+    return g;
+  }
+
+  function hexToRgba(hex, a){
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // Doughnut with total shown in the center hole — a common "premium dashboard" touch.
+  const centerTextPlugin = {
+    id: "centerText",
+    afterDraw(chart){
+      if(!chart.config._centerText) return;
+      const {ctx, chartArea} = chart;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "700 1.5rem 'IBM Plex Mono', monospace";
+      ctx.fillStyle = "#12312B";
+      ctx.fillText(chart.config._centerText.value, cx, cy - 8);
+      ctx.font = "600 0.7rem 'IBM Plex Sans', sans-serif";
+      ctx.fillStyle = "#6B6558";
+      ctx.fillText(chart.config._centerText.label, cx, cy + 14);
+      ctx.restore();
+    }
+  };
+
   function makeDoughnut(canvasId, dataMap, total){
     if(!hasChart) return;
     destroyChart(canvasId);
@@ -539,17 +597,23 @@
     if(!ctx) return;
     const labels = Object.keys(dataMap);
     const values = Object.values(dataMap);
-    chartInstances[canvasId] = new Chart(ctx, {
+    const colors = PALETTE.slice(0,labels.length);
+    const chart = new Chart(ctx, {
       type: "doughnut",
-      data: { labels, datasets: [{ data: values, backgroundColor: PALETTE.slice(0,labels.length), borderColor:"#F6F1E4", borderWidth:2 }] },
+      data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor:"#fff", borderWidth:3, hoverOffset: 6 }] },
       options: {
         responsive:true, maintainAspectRatio:false,
+        cutout: "68%",
         plugins:{
-          legend:{ position:"bottom", labels:{ boxWidth:12, padding:14 } },
-          tooltip:{ callbacks:{ label: (c)=> `${c.label}: ${c.raw} (${pct(c.raw, total)}%)` } }
+          legend:{ position:"bottom", labels:{ boxWidth:12, padding:14, usePointStyle:true, pointStyle:"circle" } },
+          tooltip:{ callbacks:{ label: (c)=> `${c.label}: ${c.raw.toLocaleString('es-CL')} (${pct(c.raw, total)}%)` } }
         }
-      }
+      },
+      plugins: [centerTextPlugin]
     });
+    chart.config._centerText = { value: total.toLocaleString('es-CL'), label: "turistas" };
+    chart.update();
+    chartInstances[canvasId] = chart;
   }
 
   function makePercentBar(canvasId, entries, denom, colorOffset){
@@ -560,10 +624,18 @@
     const labels = entries.map(e=>e[0]);
     const counts = entries.map(e=>e[1]);
     const percents = counts.map(c => denom ? +(c/denom*100).toFixed(1) : 0);
-    const colors = labels.map((_,i)=> PALETTE[(i+colorOffset) % PALETTE.length]);
+    const baseColors = labels.map((_,i)=> PALETTE[(i+colorOffset) % PALETTE.length]);
     chartInstances[canvasId] = new Chart(ctx, {
       type: "bar",
-      data: { labels, datasets: [{ data: percents, backgroundColor: colors, borderRadius:4, maxBarThickness: 26 }] },
+      data: { labels, datasets: [{
+        data: percents,
+        backgroundColor: (c)=>{
+          const {ctx:cctx, chartArea} = c.chart;
+          if(!chartArea) return baseColors[c.dataIndex];
+          return makeGradient(cctx, chartArea, hexToRgba(baseColors[c.dataIndex],0.55), baseColors[c.dataIndex]);
+        },
+        borderRadius:6, maxBarThickness: 26
+      }] },
       options: {
         indexAxis: "y",
         responsive:true, maintainAspectRatio:false,
@@ -573,11 +645,77 @@
         },
         plugins:{
           legend:{ display:false },
-          tooltip:{ callbacks:{ label: (c)=> `${c.raw}% (${counts[c.dataIndex]} de ${denom})` } }
+          tooltip:{ callbacks:{ label: (c)=> `${c.raw}% (${counts[c.dataIndex].toLocaleString('es-CL')} de ${denom.toLocaleString('es-CL')})` } }
         }
       }
     });
   }
+
+  // Daily-flow area chart across the whole date range — headline "flujo de turistas" visual.
+  function makeFlujoChart(canvasId, recs){
+    if(!hasChart) return;
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if(!ctx) return;
+    const byDate = {};
+    recs.forEach(r=>{ if(r.fecha) byDate[r.fecha] = (byDate[r.fecha]||0) + r.total; });
+    const dates = Object.keys(byDate).sort();
+    if(dates.length === 0) return;
+    const start = parseLocalDate(dates[0]), end = parseLocalDate(dates[dates.length-1]);
+    const allDates = [];
+    for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+      allDates.push(d.toISOString().slice(0,10));
+    }
+    const values = allDates.map(d=> byDate[d] || 0);
+    const labels = allDates.map(d=>{
+      const dt = parseLocalDate(d);
+      return dt.toLocaleDateString('es-ES', {day:'2-digit', month:'short'});
+    });
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderColor: "#1B4C8C",
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: "#1B4C8C",
+          tension: 0.35,
+          fill: true,
+          backgroundColor: (c)=>{
+            const {ctx:cctx, chartArea} = c.chart;
+            if(!chartArea) return "rgba(27,76,140,0.12)";
+            return makeGradient(cctx, chartArea, "rgba(27,76,140,0.32)", "rgba(27,76,140,0.01)");
+          }
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction: { mode:"index", intersect:false },
+        scales: {
+          x: { grid:{ display:false }, ticks:{ maxTicksLimit: 10, autoSkip:true } },
+          y: { beginAtZero:true, grid:{ color:"rgba(34,32,27,0.08)" }, ticks:{ precision:0 } }
+        },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{
+            title: (items)=> allDates[items[0].dataIndex] ? parseLocalDate(allDates[items[0].dataIndex]).toLocaleDateString('es-ES',{weekday:'long', day:'2-digit', month:'long'}) : "",
+            label: (c)=> `${c.raw.toLocaleString('es-CL')} turistas`
+          }}
+        }
+      }
+    });
+  }
+
+  const STAT_ICONS = {
+    turistas: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    fem: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M12 13v8M9 18h6"/></svg>`,
+    masc: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="14" r="5"/><path d="M19 5l-5.4 5.4M19 5h-5M19 5v5"/></svg>`,
+    registros: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+    surf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c4-6 8-8 20-8-2 8-8 14-14 16-2-2-4-5-6-8Z"/><path d="M2 20c6-1 12-4 16-9"/></svg>`
+  };
 
   function renderPanel(){
     const el = $("panel-content");
@@ -620,18 +758,47 @@
     const topMotivos = Object.entries(motivoCount).sort((a,b)=>b[1]-a[1]);
     const topProcedencias = Object.entries(procedenciaCount).sort((a,b)=>b[1]-a[1]);
 
-    el.innerHTML = `
-      <h2 class="section-title">Panel general</h2>
-      <p class="section-sub">${numRegistros} registro${numRegistros===1?'':'s'} capturado${numRegistros===1?'':'s'} · análisis en porcentajes sobre el total.</p>
+    const fechas = recs.map(r=>r.fecha).filter(Boolean).sort();
+    const rangeLabel = fechas.length ? (
+      parseLocalDate(fechas[0]).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}) + " — " +
+      parseLocalDate(fechas[fechas.length-1]).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})
+    ) : "";
 
-      <div class="stat-cards">
-        <div class="stat-card"><div class="num">${totalTuristas}</div><div class="lbl">Turistas totales</div></div>
-        <div class="stat-card"><div class="num">${pct(totalFem,totalTuristas)}%</div><div class="lbl">Femenino</div></div>
-        <div class="stat-card"><div class="num">${pct(totalMasc,totalTuristas)}%</div><div class="lbl">Masculino</div></div>
-        <div class="stat-card"><div class="num">${numRegistros}</div><div class="lbl">Registros</div></div>
+    const topMotivo = topMotivos[0];
+    const topMotivoPct = topMotivo ? pct(topMotivo[1], numRegistros) : "0.0";
+
+    el.innerHTML = `
+      <div class="panel-hero">
+        <div>
+          <h2 class="section-title">Panel general</h2>
+          <p class="section-sub" style="margin:0;">${numRegistros.toLocaleString('es-CL')} registro${numRegistros===1?'':'s'} capturado${numRegistros===1?'':'s'} · análisis en porcentajes sobre el total.</p>
+        </div>
+        ${rangeLabel ? `<span class="season-badge"><span class="dot"></span>${rangeLabel}</span>` : ""}
       </div>
 
+      <div class="stat-cards">
+        <div class="stat-card"><div class="icon">${STAT_ICONS.turistas}</div><div class="num" data-count="${totalTuristas}">0</div><div class="lbl">Turistas totales</div></div>
+        <div class="stat-card"><div class="icon">${STAT_ICONS.fem}</div><div class="num" data-count="${pct(totalFem,totalTuristas)}" data-suffix="%">0</div><div class="lbl">Femenino</div></div>
+        <div class="stat-card"><div class="icon">${STAT_ICONS.masc}</div><div class="num" data-count="${pct(totalMasc,totalTuristas)}" data-suffix="%">0</div><div class="lbl">Masculino</div></div>
+        <div class="stat-card"><div class="icon">${STAT_ICONS.registros}</div><div class="num" data-count="${numRegistros}">0</div><div class="lbl">Registros</div></div>
+      </div>
+
+      ${topMotivo ? `
+      <div class="highlight-card">
+        <div class="hl-icon">${STAT_ICONS.surf}</div>
+        <div class="hl-body">
+          <div class="hl-eyebrow">Motivo de viaje principal</div>
+          <p class="hl-title">${escapeHtml(topMotivo[0])} — <span class="pct">${topMotivoPct}%</span></p>
+          <p class="hl-sub">${topMotivo[1].toLocaleString('es-CL')} de ${numRegistros.toLocaleString('es-CL')} registros mencionan "${escapeHtml(topMotivo[0])}" como motivo del viaje.</p>
+        </div>
+      </div>` : ""}
+
       <div class="chart-grid">
+        <div class="chart-card wide">
+          <h3>Flujo diario de turistas</h3>
+          <p class="chart-denom">Personas registradas por día durante la temporada</p>
+          <div class="chart-box flujo"><canvas id="chart-flujo"></canvas></div>
+        </div>
         <div class="chart-card">
           <h3>Género</h3>
           <p class="chart-denom">% del total de turistas</p>
@@ -643,21 +810,25 @@
           <div class="chart-box"><canvas id="chart-edad"></canvas></div>
         </div>
         <div class="chart-card">
+          <span class="rank-badge">#1 ${escapeHtml(topMotivo ? topMotivo[0] : "")}</span>
           <h3>Motivo del viaje</h3>
           <p class="chart-denom">% de los registros</p>
           <div class="chart-box tall"><canvas id="chart-motivo"></canvas></div>
         </div>
         <div class="chart-card">
+          <span class="rank-badge">#1 ${escapeHtml(topProcedencias[0] ? topProcedencias[0][0] : "")}</span>
           <h3>Procedencia</h3>
           <p class="chart-denom">% de los registros</p>
           <div class="chart-box tall"><canvas id="chart-procedencia"></canvas></div>
         </div>
         <div class="chart-card wide">
+          <span class="rank-badge">#1 ${escapeHtml(topAtractivos[0] ? topAtractivos[0][0] : "")}</span>
           <h3>Atractivos turísticos más consultados</h3>
           <p class="chart-denom">% de los registros que mencionan cada atractivo</p>
           <div class="chart-box tall"><canvas id="chart-atractivos"></canvas></div>
         </div>
         <div class="chart-card wide">
+          <span class="rank-badge">#1 ${escapeHtml(topServicios[0] ? topServicios[0][0] : "")}</span>
           <h3>Servicios turísticos más consultados</h3>
           <p class="chart-denom">% de los registros que mencionan cada servicio</p>
           <div class="chart-box tall"><canvas id="chart-servicios"></canvas></div>
@@ -665,6 +836,12 @@
       </div>
     `;
 
+    el.querySelectorAll('.stat-card .num[data-count]').forEach(node=>{
+      const end = parseFloat(node.dataset.count) || 0;
+      animateCount(node, end, { suffix: node.dataset.suffix || "" });
+    });
+
+    makeFlujoChart("chart-flujo", recs);
     makeDoughnut("chart-genero", generoData, totalTuristas);
     makePercentBar("chart-edad", Object.entries(edades), totalEdades, 3);
     makePercentBar("chart-motivo", topMotivos, numRegistros, 1);
@@ -684,7 +861,7 @@
       return;
     }
     el.innerHTML = state.records.map(r=>{
-      const d = new Date(r.fecha);
+      const d = parseLocalDate(r.fecha);
       const dd = isNaN(d) ? r.fecha : d.toLocaleDateString('es-ES', {day:'2-digit', month:'short'});
       return `
       <div class="record-card" data-id="${r.id}">
@@ -834,5 +1011,17 @@
   }
   function escapeAttr(str){ return escapeHtml(str); }
 
-  loadState();
+  async function bootstrap(){
+    if(new URLSearchParams(location.search).get('seed') === '1'){
+      try{
+        const res = await fetch('seed-data.json');
+        const seed = await res.json();
+        await window.__storageAdapter.set(STORAGE_KEY, JSON.stringify(seed), true);
+      }catch(e){
+        console.error('[Registro de Turistas] No se pudo cargar el set de datos de demostración.', e);
+      }
+    }
+    loadState();
+  }
+  bootstrap();
 })();
