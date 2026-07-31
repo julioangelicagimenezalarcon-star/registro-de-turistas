@@ -10,6 +10,7 @@
   // adapter with calls to a real backend (see README.md "Next steps").
   const hasNativeStorage = typeof window !== 'undefined' && window.storage &&
     typeof window.storage.get === 'function';
+  window.__hasNativeStorage = hasNativeStorage;
 
   window.__storageAdapter = hasNativeStorage ? window.storage : (function(){
     const PREFIX = 'bt_';
@@ -40,6 +41,7 @@
 })();
 
 (function(){
+  const hasNativeStorage = !!window.__hasNativeStorage;
   const DEFAULT_ATRACTIVOS = ["Lobería","Iglesia de Piedra","Buchupureo","Pullay","Trehualemu","Rinconada","Santa Rita","Humedal Taucú","Humedal Colmuyao","Monte Zorro","Mela","Parque las Nalkas","Ecomuseo","Minimuseo","Cerro el Calvario","Centro Artesanal","Parque los Avellanos","Fiesta de la Candelaria"];
   const DEFAULT_SERVICIOS = ["Restaurantes","Guías turísticos","Tours Operadores","Oficinas de información turística"];
   const ALOJAMIENTO_TIPOS = ["Cabañas","Hostales","Campings","Hotel","Lodge","Residencial"];
@@ -195,7 +197,26 @@
     enterApp(chosen);
   });
 
-  async function loadState(){
+  // ---------- Backend compartido (API) vs. almacenamiento local ----------
+  // Cuando la app corre con server.js (Railway) hay un backend real con Postgres
+  // y TODOS los dispositivos comparten los mismos registros. Si la API no
+  // responde (ej. GitHub Pages, sin servidor, o sin conexión) se cae de vuelta
+  // al comportamiento anterior: guardar solo en este dispositivo/navegador.
+  let useApi = false;
+
+  async function fetchSharedData(){
+    const [recRes, customRes] = await Promise.all([fetch('/api/records'), fetch('/api/custom')]);
+    if(!recRes.ok || !customRes.ok) throw new Error('api no disponible');
+    const recData = await recRes.json();
+    const customData = await customRes.json();
+    return {
+      records: recData.records || [],
+      atractivosCustom: customData.atractivosCustom || [],
+      serviciosCustom: customData.serviciosCustom || []
+    };
+  }
+
+  async function loadLocalBlob(){
     try{
       const res = await window.__storageAdapter.get(STORAGE_KEY, true);
       if(res && res.value){
@@ -207,9 +228,50 @@
     }catch(e){
       // no existing data yet, keep defaults
     }
+  }
+
+  function updateSharedNote(){
+    const note = document.querySelector(".shared-note");
+    if(!note) return;
+    note.textContent = useApi
+      ? "Esta bitácora es compartida: todos los informadores que usen este enlace ven y añaden a los mismos registros."
+      : "Sin conexión al servidor compartido: los registros se están guardando solo en este dispositivo/navegador.";
+    note.classList.toggle("mismatch", !useApi);
+  }
+
+  async function loadState(){
+    if(hasNativeStorage){
+      useApi = false;
+      await loadLocalBlob();
+    } else {
+      try{
+        const shared = await fetchSharedData();
+        useApi = true;
+        state.records = shared.records;
+        state.atractivosCustom = shared.atractivosCustom;
+        state.serviciosCustom = shared.serviciosCustom;
+      }catch(e){
+        useApi = false;
+        console.warn('[Registro de Turistas] Backend compartido no disponible: usando localStorage local a este dispositivo.', e);
+        await loadLocalBlob();
+      }
+    }
+    updateSharedNote();
     renderChips();
     renderPanel();
     renderHistorial();
+  }
+
+  async function refreshFromApi(){
+    if(!useApi) return;
+    try{
+      const shared = await fetchSharedData();
+      state.records = shared.records;
+      state.atractivosCustom = shared.atractivosCustom;
+      state.serviciosCustom = shared.serviciosCustom;
+    }catch(e){
+      console.error('[Registro de Turistas] No se pudo actualizar desde el servidor.', e);
+    }
   }
 
   async function saveState(){
@@ -222,13 +284,13 @@
 
   // ---------- Tabs ----------
   document.querySelectorAll(".tab-btn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+    btn.addEventListener("click", async ()=>{
       document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
       document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
       btn.classList.add("active");
       $("panel-"+btn.dataset.tab).classList.add("active");
-      if(btn.dataset.tab === "panel") renderPanel();
-      if(btn.dataset.tab === "historial") renderHistorial();
+      if(btn.dataset.tab === "panel"){ await refreshFromApi(); renderPanel(); }
+      if(btn.dataset.tab === "historial"){ await refreshFromApi(); renderHistorial(); }
     });
   });
 
@@ -306,27 +368,45 @@
     });
   }
 
-  $("atractivo-add-btn").addEventListener("click", ()=>{
+  async function addCustomOption(kind, val){
+    if(useApi){
+      try{
+        const res = await fetch('/api/custom', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({kind, value: val})
+        });
+        const data = await res.json();
+        state.atractivosCustom = data.atractivosCustom;
+        state.serviciosCustom = data.serviciosCustom;
+        return;
+      }catch(e){
+        console.error('No se pudo guardar la opción personalizada en el servidor', e);
+      }
+    }
+    if(kind === "atractivo"){ if(!state.atractivosCustom.includes(val)) state.atractivosCustom.push(val); }
+    else { if(!state.serviciosCustom.includes(val)) state.serviciosCustom.push(val); }
+    if(!useApi) await saveState();
+  }
+
+  $("atractivo-add-btn").addEventListener("click", async ()=>{
     const parts = $("atractivo-new").value.split(",").map(s=>s.trim()).filter(Boolean);
     if(parts.length === 0) return;
-    parts.forEach(val=>{
-      if(!state.atractivosCustom.includes(val)) state.atractivosCustom.push(val);
+    for(const val of parts){
+      await addCustomOption("atractivo", val);
       selectedAtractivos.add(val);
-    });
+    }
     $("atractivo-new").value = "";
     renderChips();
-    saveState();
   });
-  $("servicio-add-btn").addEventListener("click", ()=>{
+  $("servicio-add-btn").addEventListener("click", async ()=>{
     const parts = $("servicio-new").value.split(",").map(s=>s.trim()).filter(Boolean);
     if(parts.length === 0) return;
-    parts.forEach(val=>{
-      if(!state.serviciosCustom.includes(val)) state.serviciosCustom.push(val);
+    for(const val of parts){
+      await addCustomOption("servicio", val);
       selectedServicios.add(val);
-    });
+    }
     $("servicio-new").value = "";
     renderChips();
-    saveState();
   });
 
   // ---------- País / subdivisión Chile ----------
@@ -490,8 +570,24 @@
       atractivos: [...selectedAtractivos],
       servicios: [...selectedServicios]
     };
-    state.records.unshift(record);
-    await saveState();
+    if(useApi){
+      try{
+        const res = await fetch('/api/records', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(record)
+        });
+        if(!res.ok) throw new Error('respuesta no OK del servidor');
+        const data = await res.json();
+        state.records.unshift(data.record);
+      }catch(e){
+        console.error('No se pudo guardar el registro en el servidor', e);
+        alert('No se pudo guardar el registro: sin conexión con el servidor compartido. Intenta de nuevo.');
+        return;
+      }
+    } else {
+      state.records.unshift(record);
+      await saveState();
+    }
 
     // reset form
     resetPaisCascade();
@@ -883,8 +979,15 @@
     document.querySelectorAll(".del-btn").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
         const id = btn.dataset.id;
+        if(useApi){
+          try{
+            await fetch('/api/records/'+encodeURIComponent(id), {method:'DELETE'});
+          }catch(e){
+            console.error('No se pudo eliminar el registro en el servidor', e);
+          }
+        }
         state.records = state.records.filter(r=>r.id !== id);
-        await saveState();
+        if(!useApi) await saveState();
         renderHistorial();
         renderPanel();
       });
@@ -1022,6 +1125,35 @@
 
   async function bootstrap(){
     const forceSeed = new URLSearchParams(location.search).get('seed') === '1';
+
+    if(!hasNativeStorage){
+      // Standalone deploy (Railway): try the shared API first. Only auto-seed
+      // when the shared database is genuinely empty -- never on ?seed=1 alone,
+      // to avoid ever duplicating real field data captured by encuestadores.
+      try{
+        const recRes = await fetch('/api/records');
+        if(recRes.ok){
+          const recData = await recRes.json();
+          if((recData.records || []).length === 0){
+            try{
+              const seedRes = await fetch('seed-data.json');
+              const seed = await seedRes.json();
+              await fetch('/api/import', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({records: seed.records})
+              });
+            }catch(e){
+              console.error('[Registro de Turistas] No se pudo cargar el set de datos de demostración.', e);
+            }
+          }
+          loadState();
+          return;
+        }
+      }catch(e){
+        // API not reachable (e.g. GitHub Pages, sin servidor) -- fall through to localStorage below
+      }
+    }
+
     if(forceSeed || !(await hasExistingData())){
       try{
         const res = await fetch('seed-data.json');

@@ -565,6 +565,10 @@
     color: rgba(246,241,228,0.55);
     margin-top: 8px;
   }
+  .shared-note.mismatch{
+    color: #E0A94D;
+    font-weight:600;
+  }
 
   .chart-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-bottom: 22px; }
   @media (max-width: 720px){ .chart-grid{ grid-template-columns: 1fr; } }
