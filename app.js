@@ -676,19 +676,6 @@
     requestAnimationFrame(frame);
   }
 
-  function makeGradient(ctx, area, colorTop, colorBottom){
-    const g = ctx.createLinearGradient(0, area.top, 0, area.bottom);
-    g.addColorStop(0, colorTop);
-    g.addColorStop(1, colorBottom);
-    return g;
-  }
-
-  function hexToRgba(hex, a){
-    const h = hex.replace('#','');
-    const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
-    return `rgba(${r},${g},${b},${a})`;
-  }
-
   // Doughnut with total shown in the center hole — a common "premium dashboard" touch.
   const centerTextPlugin = {
     id: "centerText",
@@ -749,11 +736,7 @@
       type: "bar",
       data: { labels, datasets: [{
         data: percents,
-        backgroundColor: (c)=>{
-          const {ctx:cctx, chartArea} = c.chart;
-          if(!chartArea) return baseColors[c.dataIndex];
-          return makeGradient(cctx, chartArea, hexToRgba(baseColors[c.dataIndex],0.55), baseColors[c.dataIndex]);
-        },
+        backgroundColor: baseColors,
         borderRadius:6, maxBarThickness: 26
       }] },
       options: {
@@ -804,11 +787,7 @@
           pointHoverBackgroundColor: "#1B4C8C",
           tension: 0.35,
           fill: true,
-          backgroundColor: (c)=>{
-            const {ctx:cctx, chartArea} = c.chart;
-            if(!chartArea) return "rgba(27,76,140,0.12)";
-            return makeGradient(cctx, chartArea, "rgba(27,76,140,0.32)", "rgba(27,76,140,0.01)");
-          }
+          backgroundColor: "rgba(27,76,140,0.14)"
         }]
       },
       options: {
