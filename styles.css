@@ -581,13 +581,8 @@
     min-width: 0;
     box-shadow: 0 2px 10px rgba(18,49,43,0.04);
     transition: box-shadow .18s ease, transform .18s ease;
-    animation: chartFadeIn .5s ease both;
   }
   .chart-card:hover{ box-shadow: 0 10px 24px rgba(18,49,43,0.09); }
-  @keyframes chartFadeIn{
-    from{ opacity:0; transform: translateY(8px); }
-    to{ opacity:1; transform: translateY(0); }
-  }
   .chart-card.wide{ grid-column: 1 / -1; }
   .chart-card .rank-badge{
     position:absolute;
