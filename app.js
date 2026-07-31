@@ -824,6 +824,19 @@
       </div>`;
       return;
     }
+    try{
+      renderPanelContent(el, recs);
+    }catch(e){
+      console.error("[Registro de Turistas] Error al renderizar el Panel:", e);
+      el.innerHTML = `<div class="empty-state">
+        <p style="color:var(--stamp); font-weight:600;">No se pudo mostrar el Panel.</p>
+        <p style="font-size:0.8rem;">${escapeHtml(e.message || String(e))}</p>
+        <p style="font-size:0.78rem; margin-top:10px;">Chart.js ${typeof Chart !== 'undefined' ? 'cargó correctamente' : 'NO cargó'}.</p>
+      </div>`;
+    }
+  }
+
+  function renderPanelContent(el, recs){
     const totalTuristas = recs.reduce((s,r)=>s+r.total,0);
     const totalFem = recs.reduce((s,r)=>s+r.femenino,0);
     const totalMasc = recs.reduce((s,r)=>s+r.masculino,0);
