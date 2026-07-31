@@ -1,3 +1,27 @@
+// Global diagnostic banner: catches ANY uncaught error or promise rejection,
+// anywhere in the page, and shows it in a fixed banner styled with inline
+// attributes only (no dependency on app CSS/JS state). Temporary, for
+// tracking down a rendering issue reported only on iOS Safari.
+(function(){
+  function showBanner(text){
+    var el = document.getElementById('__diag_banner');
+    if(!el){
+      el = document.createElement('div');
+      el.id = '__diag_banner';
+      el.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#a63d2f;color:#fff;font-family:monospace;font-size:12px;padding:10px;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;');
+      document.body ? document.body.appendChild(el) : document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(el); });
+    }
+    el.textContent += text + '\n\n';
+  }
+  window.addEventListener('error', function(e){
+    showBanner('[error] ' + e.message + ' @ ' + e.filename + ':' + e.lineno + ':' + e.colno + '\nUA: ' + navigator.userAgent);
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var reason = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+    showBanner('[promise] ' + reason + '\nUA: ' + navigator.userAgent);
+  });
+})();
+
 (function(){
   // Storage adapter: uses Claude's native window.storage when running inside
   // a Claude.ai artifact (shared, persistent, multi-user). When this app is
