@@ -193,6 +193,46 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
+- **(2026-08-21) La API pasa a exigir clave de acceso (CN-001 de la auditoría)**.
+
+  ⚠️ **`APP_CLAVE` es obligatoria: sin esa variable de entorno el servidor NO
+  arranca.** Es a propósito (falla cerrado) — arrancar "abierto por defecto" es
+  exactamente como estuvo esto hasta hoy. **Al desplegar, configurar primero la
+  variable en Railway y recién después subir el código**, o el servicio se cae.
+
+  Cómo funciona: la clave vive solo en el servidor. `POST /api/login` la compara
+  en tiempo constante y devuelve una cookie `rt_sesion` firmada con HMAC-SHA256
+  (`HttpOnly`, `SameSite=Lax`, `Secure` bajo https, 6 meses). Todo lo que cuelga
+  de `/api` exige esa cookie; las únicas excepciones públicas son
+  `GET /api/sesion` —que solo dice si hay sesión, y es lo que le permite al front
+  saber si pedir la clave— y el propio login.
+
+  **Por qué no un token en el front:** cualquiera que abra el código de la página
+  lo lee. Con la cookie firmada el navegador nunca ve la clave, y como es
+  `HttpOnly` tampoco se puede robar la sesión desde JavaScript.
+
+  Se agregó freno a la fuerza bruta: 15 intentos por IP en 10 minutos y 300 en
+  total. Los topes son altos a propósito — los informadores comparten el WiFi de
+  la municipalidad, así que comparten IP, y un tope bajo los bloquearía entre
+  ellos; para adivinar una clave larga, 15 intentos no sirven de nada. El tope
+  global se dejó alto por lo contrario: si es muy bajo, un atacante puede dejar
+  fuera al equipo real solo con fallar (lección de SIC-PRO, donde el ataque vino
+  repartido entre muchas IP).
+
+  En el front: `iniciarPantallaLogin()` consulta `/api/sesion` y solo muestra el
+  campo de clave si hay backend y no hay sesión. **Lo delicado fue el 401**: si
+  se confundiera con "no hay servidor", la app caería a `localStorage` sin avisar
+  y los registros quedarían guardados solo en ese teléfono. Por eso
+  `fetchSharedData()` marca el 401 aparte (`err.noAutorizado`) y la app vuelve a
+  pedir la clave en lugar de seguir como si nada.
+
+  También se agregaron cabeceras de seguridad (CSP, `X-Frame-Options: DENY`,
+  `nosniff`, HSTS bajo https) — CN-006. `'unsafe-inline'` sigue habilitado para
+  estilos porque las barras del Panel llevan el ancho en el atributo `style`.
+
+  `/api/import` ya no es público: quedó detrás de la sesión, no eliminado, para
+  poder migrar datos cuando haga falta.
+
 - **(2026-08-21) Escala de los gráficos de % y Procedencia región ⇄ comuna**:
   Julio reportó que el gráfico de Procedencia era ilegible. Eran dos cosas.
 

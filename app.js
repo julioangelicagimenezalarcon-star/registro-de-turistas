@@ -187,14 +187,81 @@
   }
 
   populateLoginUsers();
-  const savedUser = sessionStorage.getItem("bt_current_user");
-  if(savedUser && PERSONAL.includes(savedUser)) enterApp(savedUser);
 
-  $("login-btn").addEventListener("click", ()=>{
+  function mostrarErrorLogin(msg){
+    const el = $("login-error");
+    if(!el) return;
+    el.textContent = msg || "";
+    el.classList.toggle("hidden", !msg);
+  }
+
+  // Se llama cuando el servidor responde 401 en medio del uso: la sesión venció
+  // y hay que volver a pedir la clave, en vez de seguir como si nada.
+  function volverAlLogin(msg){
+    appWrap.classList.add("hidden");
+    loginScreen.classList.remove("hidden");
+    $("login-clave-field").classList.remove("hidden");
+    const campo = $("login-clave");
+    if(campo) campo.value = "";
+    mostrarErrorLogin(msg || "");
+  }
+
+  // Decide si hay que pedir la clave. Solo se pide cuando hay backend
+  // compartido y todavía no hay sesión en este dispositivo. Devuelve true si el
+  // informador ya quedó dentro sin escribir nada.
+  async function iniciarPantallaLogin(){
+    const est = await consultarSesion();
+    apiDisponible = !!est.api;
+    sesionIniciada = !!est.autenticado;
+    $("login-clave-field").classList.toggle("hidden", !(apiDisponible && !sesionIniciada));
+    const savedUser = sessionStorage.getItem("bt_current_user");
+    if(savedUser && PERSONAL.includes(savedUser) && (!apiDisponible || sesionIniciada)){
+      enterApp(savedUser);
+      return true;
+    }
+    return false;
+  }
+
+  async function intentarIngresar(){
     const chosen = loginUserSelect.value;
     if(!chosen) return;
+    const btn = $("login-btn");
+
+    if(apiDisponible && !sesionIniciada){
+      const campo = $("login-clave");
+      const clave = campo ? campo.value : "";
+      if(!clave){ mostrarErrorLogin("Escribe la clave de acceso."); return; }
+      btn.disabled = true;
+      mostrarErrorLogin("");
+      try{
+        const res = await fetch('/api/login', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ clave })
+        });
+        if(res.status === 429){
+          mostrarErrorLogin("Demasiados intentos fallidos. Espera unos minutos y vuelve a probar.");
+          return;
+        }
+        if(!res.ok){ mostrarErrorLogin("Clave incorrecta."); return; }
+        sesionIniciada = true;
+        campo.value = "";
+        $("login-clave-field").classList.add("hidden");
+      }catch(e){
+        mostrarErrorLogin("No se pudo conectar con el servidor. Revisa tu señal.");
+        return;
+      }finally{
+        btn.disabled = false;
+      }
+      await loadState();   // recién ahora hay permiso para traer los registros
+    }
+
     sessionStorage.setItem("bt_current_user", chosen);
     enterApp(chosen);
+  }
+
+  $("login-btn").addEventListener("click", intentarIngresar);
+  $("login-clave").addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){ e.preventDefault(); intentarIngresar(); }
   });
 
   // ---------- Backend compartido (API) vs. almacenamiento local ----------
@@ -203,9 +270,29 @@
   // responde (ej. GitHub Pages, sin servidor, o sin conexión) se cae de vuelta
   // al comportamiento anterior: guardar solo en este dispositivo/navegador.
   let useApi = false;
+  let apiDisponible = false;   // hay backend compartido respondiendo
+  let sesionIniciada = false;  // además, esta sesión está autenticada
+
+  async function consultarSesion(){
+    try{
+      const res = await fetch('/api/sesion');
+      if(!res.ok) return { api:false, autenticado:false };
+      return await res.json();
+    }catch(e){
+      return { api:false, autenticado:false };
+    }
+  }
 
   async function fetchSharedData(){
     const [recRes, customRes] = await Promise.all([fetch('/api/records'), fetch('/api/custom')]);
+    if(recRes.status === 401 || customRes.status === 401){
+      // Sesión vencida o inexistente: NO es lo mismo que "no hay servidor".
+      // Si se confundieran, la app caería a localStorage sin avisar y los
+      // registros quedarían guardados solo en este teléfono.
+      const err = new Error('no autorizado');
+      err.noAutorizado = true;
+      throw err;
+    }
     if(!recRes.ok || !customRes.ok) throw new Error('api no disponible');
     const recData = await recRes.json();
     const customData = await customRes.json();
@@ -251,6 +338,13 @@
         state.atractivosCustom = shared.atractivosCustom;
         state.serviciosCustom = shared.serviciosCustom;
       }catch(e){
+        if(e && e.noAutorizado){
+          // Hay servidor, pero la sesión caducó: se vuelve a pedir la clave en
+          // vez de guardar a ciegas en este dispositivo.
+          sesionIniciada = false;
+          volverAlLogin("Tu sesión venció. Vuelve a escribir la clave.");
+          return;
+        }
         useApi = false;
         console.warn('[Registro de Turistas] Backend compartido no disponible: usando localStorage local a este dispositivo.', e);
         await loadLocalBlob();
@@ -576,6 +670,11 @@
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify(record)
         });
+        if(res.status === 401){
+          sesionIniciada = false;
+          volverAlLogin("Tu sesión venció. Vuelve a escribir la clave y guarda de nuevo.");
+          return;
+        }
         if(!res.ok) throw new Error('respuesta no OK del servidor');
         const data = await res.json();
         state.records.unshift(data.record);
@@ -1310,7 +1409,15 @@
   async function bootstrap(){
     const pideSeed = new URLSearchParams(location.search).get('seed') === '1';
 
+    await iniciarPantallaLogin();
+
     if(!hasNativeStorage){
+      if(apiDisponible){
+        // Con backend compartido no se siembra NADA, ni aunque la base esté
+        // vacía. Y si todavía no hay sesión, los datos se cargan al ingresar.
+        if(sesionIniciada) await loadState();
+        return;
+      }
       try{
         const recRes = await fetch('/api/records');
         if(recRes.ok){

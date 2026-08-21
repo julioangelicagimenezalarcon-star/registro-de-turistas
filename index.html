@@ -29,6 +29,12 @@
       <label for="login-user">Selecciona tu nombre</label>
       <select id="login-user"></select>
     </div>
+    <div class="field hidden" id="login-clave-field">
+      <label for="login-clave">Clave de acceso</label>
+      <input type="password" id="login-clave" autocomplete="current-password" placeholder="La clave del equipo">
+      <p class="field-nota">Se pide una sola vez en este dispositivo.</p>
+    </div>
+    <p class="login-error hidden" id="login-error"></p>
     <button type="button" class="stamp-btn" id="login-btn">Ingresar</button>
   </div>
 </div>
