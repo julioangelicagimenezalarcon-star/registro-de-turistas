@@ -1,30 +1,44 @@
 :root{
-    /* Fondo: el tono del verde oficial llevado al extremo oscuro. El verde
-       #7DC040 tiene 2,2 de contraste sobre blanco — no sirve de fondo ni de
-       texto sobre claro; su lugar es brillar sobre oscuro (6,3). */
-    --ink:#16330A;
-    --ink-2:#1E4310;
-    --paper:#F6F1E4;
-    --paper-2:#EFE8D6;
-    --stamp:#A63D2F;          /* rojo sello SOBRE CLARO (5,6 sobre papel) */
-    --stamp-claro:#E8785F;    /* rojo sello SOBRE OSCURO (6,1 sobre --ink) */
-    --stamp-dark:#832F24;
-    --gold:#C99A3E;
-    --charcoal:#22201B;
-    --muted:#6B6558;
-    --line: rgba(34,32,27,0.14);
-    --ok:#3D7317;
-    --warn:#A63D2F;
+    /* Paleta derivada del paisaje de Cobquecura: playa de arena negra, mar
+       cristalino, días soleados, bosques en los cerros y campos de cultivo.
+       El VERDE #7DC040 es el color oficial; el blanco y el negro vienen del
+       propio logo institucional. */
 
-    /* Paleta institucional I. Municipalidad de Cobquecura.
-       El color oficial es el VERDE #7DC040 (franja "La Costa de Ñuble").
-       Se usan tres pasos del mismo tono según sobre qué fondo van:
-         --cobq-verde      solo sobre oscuro o como relleno decorativo
-         --cobq-verde-600  barras y rellenos sobre papel (3,1 — AA grande)
-         --cobq-verde-700  texto y bordes sobre papel (5,1 — AA) */
+    /* La playa de arena negra: el fondo. No es negro puro — lleva un matiz
+       tierra para no verse como una interfaz genérica de modo oscuro. */
+    --ink:#14150E;
+    --ink-2:#1E1F16;
+
+    /* Arena seca: las tarjetas. Espuma: el texto sobre el fondo oscuro. */
+    --paper:#F3EFE4;
+    --paper-2:#E9E3D4;
+    --espuma:#F7F6F0;
+
+    /* Los cultivos y la franja del logo. #7DC040 tiene 8,3 de contraste sobre
+       la arena negra, pero solo 1,96 sobre el papel: brilla sobre oscuro y
+       desaparece sobre claro. Por eso hay tres pasos, uno por tipo de fondo. */
     --cobq-verde: #7DC040;
     --cobq-verde-600: #5A9A28;
     --cobq-verde-700: #3D7317;
+    --bosque:#2C5A22;
+
+    /* El mar y el sol, cada uno con su versión para fondo claro. */
+    --mar:#2FB3A8;
+    --mar-700:#17655E;
+    --gold:#F2B33D;
+    --sol-700:#7E6015;
+
+    /* Rojo: uno para cada fondo. Sobre la arena negra el rojo original queda
+       en 2,2 y desaparece. */
+    --stamp:#A63D2F;
+    --stamp-claro:#E8785F;
+    --stamp-dark:#832F24;
+
+    --charcoal:#14150E;
+    --muted:#6B6558;
+    --line: rgba(20,21,14,0.14);
+    --ok:#3D7317;
+    --warn:#A63D2F;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -74,12 +88,11 @@
     background: linear-gradient(90deg, var(--cobq-verde-700), var(--cobq-verde-600), var(--cobq-verde));
   }
   .login-logo{
-    width:72px; height:72px;
-    border-radius:50%;
-    object-fit:cover;
-    margin: 0 auto 16px;
+    width: 208px;
+    height: auto;
+    max-width: 78%;
+    margin: 0 auto 18px;
     display:block;
-    box-shadow: 0 0 0 2px rgba(201,154,62,0.55), 0 4px 14px rgba(0,0,0,0.2);
   }
   .login-card h1{
     font-family:'Fraunces', serif;
@@ -131,16 +144,17 @@
     font-size: 0.92rem;
   }
   .compass{
-    width:56px;height:56px;
-    border-radius:50%;
     flex:none;
-    overflow:hidden;
-    box-shadow: 0 0 0 2px rgba(201,154,62,0.55), 0 4px 14px rgba(0,0,0,0.35);
+    display:flex;
+    align-items:center;
   }
   .compass img{
-    width:100%;height:100%;
-    object-fit:cover;
+    height: 54px;
+    width: auto;
     display:block;
+  }
+  @media (max-width: 560px){
+    .compass img{ height: 44px; }
   }
   .masthead-right{ display:flex; align-items:center; gap:14px; }
 
@@ -400,7 +414,7 @@
     border: 1px solid var(--line);
     min-width: 0;
     overflow:hidden;
-    box-shadow: 0 2px 10px rgba(22,51,10,0.05);
+    box-shadow: 0 2px 10px rgba(20,21,14,0.05);
     transition: transform .18s ease, box-shadow .18s ease;
   }
   .stat-card::before{
@@ -413,7 +427,7 @@
   }
   .stat-card:hover{
     transform: translateY(-2px);
-    box-shadow: 0 10px 22px rgba(22,51,10,0.1);
+    box-shadow: 0 10px 22px rgba(20,21,14,0.1);
   }
   .stat-card .icon{
     width:30px; height:30px;
@@ -456,7 +470,7 @@
     padding: 22px 26px;
     margin-bottom: 22px;
     overflow:hidden;
-    box-shadow: 0 14px 30px rgba(22,51,10,0.28);
+    box-shadow: 0 14px 30px rgba(20,21,14,0.28);
   }
   .highlight-card::after{
     content:"";
@@ -592,10 +606,10 @@
     border-radius: 12px;
     padding: 18px 20px 10px;
     min-width: 0;
-    box-shadow: 0 2px 10px rgba(22,51,10,0.04);
+    box-shadow: 0 2px 10px rgba(20,21,14,0.04);
     transition: box-shadow .18s ease, transform .18s ease;
   }
-  .chart-card:hover{ box-shadow: 0 10px 24px rgba(22,51,10,0.09); }
+  .chart-card:hover{ box-shadow: 0 10px 24px rgba(20,21,14,0.09); }
   .chart-card.wide{ grid-column: 1 / -1; }
   .chart-card .rank-badge{
     position:absolute;

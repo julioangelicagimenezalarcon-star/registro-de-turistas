@@ -719,10 +719,10 @@
   });
 
   // ---------- Panel / dashboard (Chart.js) ----------
-  // Serie de los gráficos. Encabeza el verde institucional, en el paso 600 que
-  // sí contrasta sobre el papel de las tarjetas (el oficial #7DC040 queda en
-  // 1,96 sobre papel: sirve de relleno decorativo, no para distinguir series).
-  const PALETTE = ["#5A9A28","#C99A3E","#A63D2F","#3D7317","#8B4F3E","#6B6558","#D9B863","#9C6B4F","#264E0E","#B9DE8E"];
+  // Serie de los gráficos, tomada del paisaje de la comuna: campo, mar, bosque,
+  // trigo. Todos verificados sobre el papel de las tarjetas (>=3,0). El verde
+  // oficial #7DC040 NO entra: queda en 1,96 sobre papel y no distingue series.
+  const PALETTE = ["#5A9A28","#17655E","#2C5A22","#7E6015","#A63D2F","#3D7317","#6B6558","#8B4F3E","#9C6B4F","#B9DE8E"];
   const chartInstances = {};
 
   const hasChart = typeof Chart !== 'undefined';
@@ -771,7 +771,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "700 1.5rem 'IBM Plex Mono', monospace";
-      ctx.fillStyle = "#16330A";
+      ctx.fillStyle = "#14150E";
       ctx.fillText(chart.config._centerText.value, cx, cy - 8);
       ctx.font = "600 0.7rem 'IBM Plex Sans', sans-serif";
       ctx.fillStyle = "#6B6558";
@@ -875,14 +875,14 @@
         labels,
         datasets: [{
           data: values,
-          borderColor: "#3D7317",
+          borderColor: "#2C5A22",
           borderWidth: 2.5,
           pointRadius: 0,
           pointHoverRadius: 4,
-          pointHoverBackgroundColor: "#3D7317",
+          pointHoverBackgroundColor: "#2C5A22",
           tension: 0.35,
           fill: true,
-          backgroundColor: "rgba(61,115,23,0.14)"
+          backgroundColor: "rgba(44,90,34,0.14)"
         }]
       },
       options: {
@@ -976,7 +976,7 @@
     // Colores ESTÁTICOS, nunca funciones 'scriptable': Chart.js crasheaba el
     // Panel completo en Safari/iOS con colores calculados por callback
     // (ver README §6 y el fix del 2026-07-31). El día peak va en dorado.
-    const colors = totales.map(v => (max > 0 && v === max) ? "#C99A3E" : "#5A9A28");
+    const colors = totales.map(v => (max > 0 && v === max) ? "#F2B33D" : "#5A9A28");
     chartInstances[canvasId] = new Chart(ctx, {
       type: "bar",
       data: { labels: DIAS_SEMANA_CORTO, datasets: [{

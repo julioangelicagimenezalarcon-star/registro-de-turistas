@@ -207,48 +207,61 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
-- **(2026-08-21) El color oficial pasa a ser el VERDE `#7DC040`**, por
-  indicación de Julio: la Municipalidad cambió su color institucional. Antes la
-  app se apoyaba en el azul `#1B4C8C`, que además ni siquiera era el azul
-  oficial — salía de `logo-cobquecura.jpg`, una versión del escudo distinta a
-  la vigente en municipalidadcobquecura.cl.
+- **(2026-08-21) Identidad visual: el paisaje de Cobquecura**. La Municipalidad
+  cambió su color oficial al **verde `#7DC040`**, y Julio entregó el logo
+  institucional real y el contexto de marca: blanco y negro permitidos, y una
+  identidad basada en el campo y la playa — **arena negra**, mar cristalino,
+  días soleados, bosques en los cerros y campos de cultivo.
 
-  **El dato que ordenó todo el diseño:** `#7DC040` tiene **2,21 de contraste
-  sobre blanco** y **1,96 sobre el papel** de las tarjetas. Como texto sobre
-  claro es ilegible, y tampoco soporta texto blanco encima. Sobre oscuro, en
-  cambio, sube a **6,27**. Ese verde no es un color de fondo: es un color que
-  brilla sobre oscuro. De ahí sale la estructura:
+  **El dato que ordenó el diseño:** `#7DC040` tiene 2,21 de contraste sobre
+  blanco y 1,96 sobre el papel de las tarjetas. Como texto sobre claro es
+  ilegible y tampoco soporta texto blanco encima. Sobre un fondo oscuro sube a
+  8,3. Ese verde no es un color de fondo: es un color que brilla sobre oscuro.
+  Por eso el fondo es la **arena negra**, que además es lo más distintivo de la
+  comuna y es el fondo para el que el logo blanco ya está diseñado (17,0).
 
-  | Variable | Valor | Dónde va |
+  | Variable | Valor | De dónde sale / dónde va |
   |---|---|---|
-  | `--ink` | `#16330A` | fondo: el mismo tono llevado al extremo oscuro |
-  | `--cobq-verde` | `#7DC040` | oficial — solo sobre oscuro o como relleno |
-  | `--cobq-verde-600` | `#5A9A28` | barras de gráficos sobre papel (3,1) |
-  | `--cobq-verde-700` | `#3D7317` | texto y bordes sobre papel (5,1 — AA) |
-  | `--stamp` | `#A63D2F` | rojo sello SOBRE CLARO (5,6) |
-  | `--stamp-claro` | `#E8785F` | rojo sello SOBRE OSCURO (4,8) |
+  | `--ink` | `#14150E` | la playa de arena negra — fondo (negro con matiz tierra, no negro puro) |
+  | `--paper` | `#F3EFE4` | arena seca — tarjetas |
+  | `--espuma` | `#F7F6F0` | espuma — texto sobre el fondo |
+  | `--cobq-verde` | `#7DC040` | **oficial** — solo sobre oscuro |
+  | `--cobq-verde-600` | `#5A9A28` | los cultivos — barras sobre papel |
+  | `--cobq-verde-700` | `#3D7317` | texto verde sobre papel (5,0 — AA) |
+  | `--bosque` | `#2C5A22` | los bosques de los cerros |
+  | `--mar` / `--mar-700` | `#2FB3A8` / `#17655E` | mar cristalino (oscuro / claro) |
+  | `--gold` / `--sol-700` | `#F2B33D` / `#7E6015` | días soleados |
+  | `--stamp` / `--stamp-claro` | `#A63D2F` / `#E8785F` | rojo sello (sobre claro / sobre oscuro) |
 
-  El dorado y el rojo sello se conservan: son lo que mantiene la identidad de
-  pasaporte. El fondo dejó de ser el teal `#12312B` —que era azulado y ya no
-  pegaba— y con él se limpiaron sus restos en sombras, degradados,
-  `theme-color` y `manifest.json`.
+  **Regla que hay que respetar al agregar color:** cada tono tiene una versión
+  para fondo claro y otra para fondo oscuro. Usar la equivocada no es un matiz
+  estético — es texto que no se lee.
 
-  **El logo se recoloreó** (`tools/generar-logo-verde.py`): NO es un logo plano
-  sobre blanco sino una imagen circular con una foto de agua y el texto calado
-  en blanco. El primer intento lo trató como monocromo y dejó el texto
-  transparente. Lo que funciona es desplazar el TONO de los píxeles azules
-  (175°–265°) a 88°, dejando intactos los de baja saturación —el texto— y la
-  franja verde, que ya estaba en `#78C030`, casi el oficial. El original azul
-  quedó en `tools/logo-original-azul.jpg` y ya no se publica.
+  **El logo tiene dos versiones y ambas son necesarias.** El oficial
+  (`tools/logo-oficial-blanco.png`, 2210 px, descargado del sitio municipal) es
+  blanco con la franja verde. Sobre la tarjeta clara del login era **invisible**
+  — se veía solo la franja. `logo-cobquecura-oscuro.png` lo recolorea a
+  `--ink`, con la franja en `--cobq-verde-700` porque el verde oficial también
+  desaparecería sobre papel. Regla: **blanco en el encabezado (fondo oscuro),
+  oscuro en el login (tarjeta clara).**
+
+  Antes de esto la app usaba `logo-cobquecura.jpg`, que no era el logo
+  institucional sino una foto circular con el escudo calado — y de ahí salía el
+  azul `#1B4C8C` que nunca fue el color oficial. Quedó archivado en
+  `tools/logo-original-azul.jpg`.
+
+  Los estilos del logo pasaron de circulares (`72x72`, `border-radius:50%`,
+  `object-fit:cover`) a horizontales: el logo real es 1,89:1 y el recorte
+  circular le cortaba el texto.
 
   Verificado con una auditoría de contraste sobre la app corriendo, midiendo
-  cada texto contra el fondo que realmente tiene detrás (incluidos degradados):
-  **0 incumplimientos** de WCAG AA en las tres pestañas.
+  cada texto contra el fondo real que tiene detrás (degradados incluidos):
+  **0 incumplimientos de WCAG AA** en login, Registrar, Panel e Historial.
 
   De paso se corrigieron dos defectos de maquetación que el cambio dejó a la
-  vista: el badge `#1 …` se montaba sobre el título de los gráficos ("Días de
-  mayor afl~encia") y el titular de la tarjeta destacada se cortaba a media
-  palabra en pantallas angostas.
+  vista: el badge `#1 …` se montaba sobre el título de los gráficos y el
+  titular de la tarjeta destacada se cortaba a media palabra en pantallas
+  angostas.
 
 - **(2026-08-21) Borrar deja de ser destructivo (CN-010)**. Antes, un toque en
   "Eliminar" hacía un `DELETE` físico e inmediato: el registro desaparecía para
