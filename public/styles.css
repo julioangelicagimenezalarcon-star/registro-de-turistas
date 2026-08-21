@@ -664,6 +664,50 @@
     margin: 14px 0 0;
   }
 
+  /* Registros eliminados (recuperables) */
+  .eliminados-caja{
+    background: rgba(166,61,47,0.05);
+    border: 1px solid rgba(166,61,47,0.20);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .eliminados-caja h3{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 0.98rem;
+    margin: 0 0 4px;
+    color: var(--stamp-dark);
+  }
+  .eliminados-sub{
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .eliminado-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(166,61,47,0.16);
+  }
+  .eliminado-datos{ min-width: 0; }
+  .eliminado-item .proc{
+    font-weight:600;
+    font-size: 0.85rem;
+    color: var(--charcoal);
+  }
+  .eliminado-meta{
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .restaurar-btn{ flex-shrink:0; }
+  @media (max-width: 560px){
+    .eliminado-item{ flex-direction:column; align-items:flex-start; }
+  }
+
   .chart-box.taller{ height: 330px; }
 
   /* Nota al pie de un gráfico: lo que queda fuera, dicho explícitamente */

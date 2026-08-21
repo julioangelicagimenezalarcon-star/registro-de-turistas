@@ -36,6 +36,10 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Borrado lógico (CN-010). Aditivo: no toca ni una fila existente.
+  await pool.query(`ALTER TABLE records ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE records ADD COLUMN IF NOT EXISTS eliminado_por TEXT`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS records_vigentes ON records (eliminado_en) WHERE eliminado_en IS NULL`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS custom_options (
       id SERIAL PRIMARY KEY,
@@ -212,7 +216,8 @@ app.use("/api", (req, res, next) => {
 
 app.get("/api/records", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM records ORDER BY fecha DESC, id DESC LIMIT 20000");
+    const { rows } = await pool.query(
+      "SELECT * FROM records WHERE eliminado_en IS NULL ORDER BY fecha DESC, id DESC LIMIT 20000");
     res.json({ records: rows.map(rowToRecord) });
   } catch (e) {
     console.error(e);
@@ -243,9 +248,50 @@ app.post("/api/records", async (req, res) => {
   }
 });
 
+// Borrado lógico. Antes esto era un DELETE físico e inmediato: un toque
+// accidental en el celular destruía un registro para todos, sin deshacer y sin
+// dejar rastro de quién lo hizo.
+//
+// Nota honesta sobre `eliminado_por`: la sesión es una clave compartida por todo
+// el equipo, así que el servidor NO puede saber quién es realmente quien borra.
+// El nombre lo declara el propio cliente. Sirve para saber qué pasó en el día a
+// día, no como prueba: quien quiera falsearlo, puede.
 app.delete("/api/records/:id", async (req, res) => {
   try {
-    await pool.query("DELETE FROM records WHERE id = $1", [req.params.id]);
+    const quien = (req.body && req.body.informador) || null;
+    const { rowCount } = await pool.query(
+      "UPDATE records SET eliminado_en = now(), eliminado_por = $2 WHERE id = $1 AND eliminado_en IS NULL",
+      [req.params.id, quien]
+    );
+    if (!rowCount) return res.status(404).json({ error: "no_encontrado" });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "db_error" });
+  }
+});
+
+app.get("/api/records/eliminados", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM records WHERE eliminado_en IS NOT NULL ORDER BY eliminado_en DESC LIMIT 500");
+    res.json({ records: rows.map(r => Object.assign(rowToRecord(r), {
+      eliminado_en: r.eliminado_en,
+      eliminado_por: r.eliminado_por || ""
+    })) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "db_error" });
+  }
+});
+
+app.post("/api/records/:id/restaurar", async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE records SET eliminado_en = NULL, eliminado_por = NULL WHERE id = $1 AND eliminado_en IS NOT NULL",
+      [req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: "no_encontrado" });
     res.json({ ok: true });
   } catch (e) {
     console.error(e);

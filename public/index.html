@@ -193,10 +193,12 @@
       <div class="toolbar">
         <h2 class="section-title" style="margin:0;">Historial de registros</h2>
         <div style="display:flex; gap:8px;">
+          <button class="toolbar-btn hidden" id="ver-eliminados-btn">Ver eliminados</button>
           <button class="toolbar-btn" id="export-btn">Exportar CSV</button>
           <button class="toolbar-btn" id="export-xlsx-btn" style="border-color:var(--ink-2); color:var(--ink-2); font-weight:600;">Exportar Base de Datos (Excel)</button>
         </div>
       </div>
+      <div id="eliminados-panel" class="hidden"></div>
       <div id="historial-list"></div>
     </div>
   </div>

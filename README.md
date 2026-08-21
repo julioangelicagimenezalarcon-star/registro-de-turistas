@@ -207,6 +207,36 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
+- **(2026-08-21) Borrar deja de ser destructivo (CN-010)**. Antes, un toque en
+  "Eliminar" hacía un `DELETE` físico e inmediato: el registro desaparecía para
+  todos, sin preguntar, sin deshacer y sin dejar rastro de quién lo hizo. En un
+  celular, en terreno, con el turista esperando.
+
+  Ahora el borrado es **lógico**: `eliminado_en` y `eliminado_por` se marcan y la
+  fila se queda en la base. `GET /api/records` filtra por `eliminado_en IS NULL`,
+  y dos endpoints nuevos —`GET /api/records/eliminados` y
+  `POST /api/records/:id/restaurar`— permiten ver y recuperar lo borrado desde la
+  propia app, sin entrar a la base a mano. En el Historial aparece el botón
+  "Ver eliminados" (solo con backend compartido: en modo local no hay dónde
+  guardar el registro oculto).
+
+  La confirmación **dice de qué registro se trata** ("3 turistas de Chillán, del
+  21 de agosto"), no un "¿estás seguro?" a ciegas.
+
+  De paso se corrigió un bug feo del código anterior: si el `fetch` del borrado
+  fallaba, la app **igual sacaba el registro de la pantalla**. Decía "borrado"
+  mientras el registro seguía intacto en la base. Ahora, si el servidor no lo
+  acepta, no se toca la vista y se avisa.
+
+  **Sobre `eliminado_por`, honestamente:** la sesión es una clave compartida por
+  todo el equipo, así que el servidor **no puede saber** quién es realmente quien
+  borra — el nombre lo declara el propio cliente, tomado del selector del login.
+  Sirve para saber qué pasó en el día a día, no como prueba. Para que fuera
+  confiable haría falta un PIN por informador.
+
+  La migración es aditiva (`ADD COLUMN IF NOT EXISTS`): no reescribe ni borra
+  ninguna fila existente.
+
 - **(2026-08-21) La API pasa a exigir clave de acceso (CN-001 de la auditoría)**.
 
   ⚠️ **`APP_CLAVE` es obligatoria: sin esa variable de entorno el servidor NO

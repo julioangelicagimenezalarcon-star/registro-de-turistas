@@ -318,6 +318,11 @@
   }
 
   function updateSharedNote(){
+    // Restaurar lo borrado solo existe con base compartida: en modo local no hay
+    // dónde guardar el registro oculto.
+    const btnEliminados = $("ver-eliminados-btn");
+    if(btnEliminados) btnEliminados.classList.toggle("hidden", !useApi);
+
     const note = document.querySelector(".shared-note");
     if(!note) return;
     note.textContent = useApi
@@ -1221,6 +1226,88 @@
     makePercentBar("chart-servicios", topServicios, numRegistros, 4);
   }
 
+  // ---------- Registros eliminados ----------
+  // El borrado es lógico: el registro sigue en la base, marcado. Esta vista es
+  // lo que hace que eso sirva de algo sin tener que entrar a la base a mano.
+  let eliminadosVisibles = false;
+
+  async function cargarEliminados(){
+    const cont = $("eliminados-panel");
+    cont.innerHTML = `<div class="eliminados-caja"><p class="eliminados-sub">Buscando registros eliminados…</p></div>`;
+    try{
+      const res = await fetch('/api/records/eliminados');
+      if(res.status === 401){
+        sesionIniciada = false;
+        volverAlLogin("Tu sesión venció. Vuelve a escribir la clave.");
+        return;
+      }
+      if(!res.ok) throw new Error('respuesta no OK');
+      const data = await res.json();
+      renderEliminados(data.records || []);
+    }catch(e){
+      console.error('[Registro de Turistas] No se pudieron cargar los eliminados.', e);
+      cont.innerHTML = `<div class="eliminados-caja"><p class="eliminados-sub">No se pudieron cargar los registros eliminados.</p></div>`;
+    }
+  }
+
+  function renderEliminados(lista){
+    const cont = $("eliminados-panel");
+    if(!lista.length){
+      cont.innerHTML = `<div class="eliminados-caja"><p class="eliminados-sub">No hay registros eliminados.</p></div>`;
+      return;
+    }
+    cont.innerHTML = `<div class="eliminados-caja">
+      <h3>Registros eliminados (${lista.length.toLocaleString('es-CL')})</h3>
+      <p class="eliminados-sub">No se borraron de la base: quedaron ocultos. Puedes devolverlos al historial.</p>
+      ${lista.map(r=>{
+        const cuando = r.fecha ? parseLocalDate(r.fecha).toLocaleDateString('es-ES',{day:'2-digit', month:'short', year:'numeric'}) : (r.fecha||"");
+        let borrado = "";
+        if(r.eliminado_en){
+          const d = new Date(r.eliminado_en);
+          if(!isNaN(d.getTime())) borrado = d.toLocaleString('es-CL',{day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+        }
+        return `<div class="eliminado-item">
+          <div class="eliminado-datos">
+            <div class="proc">${escapeHtml(r.procedencia || "—")} · ${r.total} turista${r.total===1?'':'s'}</div>
+            <div class="eliminado-meta">Registro del ${escapeHtml(cuando)}${borrado ? " · eliminado el " + escapeHtml(borrado) : ""}${r.eliminado_por ? " por " + escapeHtml(r.eliminado_por) : ""}</div>
+          </div>
+          <button class="toolbar-btn restaurar-btn" data-id="${escapeAttr(r.id)}">Restaurar</button>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+    cont.querySelectorAll('.restaurar-btn').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        b.disabled = true;
+        try{
+          const res = await fetch('/api/records/'+encodeURIComponent(b.dataset.id)+'/restaurar', {method:'POST'});
+          if(res.status === 401){
+            sesionIniciada = false;
+            volverAlLogin("Tu sesión venció. Vuelve a escribir la clave.");
+            return;
+          }
+          if(!res.ok) throw new Error('respuesta no OK');
+        }catch(e){
+          console.error('[Registro de Turistas] No se pudo restaurar.', e);
+          alert('No se pudo restaurar el registro. Intenta de nuevo.');
+          b.disabled = false;
+          return;
+        }
+        await refreshFromApi();
+        renderHistorial();
+        renderPanel();
+        await cargarEliminados();
+      });
+    });
+  }
+
+  $("ver-eliminados-btn").addEventListener("click", async ()=>{
+    eliminadosVisibles = !eliminadosVisibles;
+    $("eliminados-panel").classList.toggle("hidden", !eliminadosVisibles);
+    $("ver-eliminados-btn").textContent = eliminadosVisibles ? "Ocultar eliminados" : "Ver eliminados";
+    if(eliminadosVisibles) await cargarEliminados();
+  });
+
   // ---------- Historial ----------
   function renderHistorial(){
     const el = $("historial-list");
@@ -1254,11 +1341,37 @@
     document.querySelectorAll(".del-btn").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
         const id = btn.dataset.id;
+        const reg = state.records.find(r=>r.id === id);
+        if(!reg) return;
+
+        // Antes bastaba un toque para destruir el registro de todos. Ahora se
+        // confirma mostrando de cuál se trata, no un "¿estás seguro?" a ciegas.
+        const cuando = reg.fecha ? parseLocalDate(reg.fecha).toLocaleDateString('es-ES',{day:'2-digit', month:'long', year:'numeric'}) : reg.fecha;
+        const detalle = `${reg.total} turista${reg.total===1?'':'s'} de ${reg.procedencia || 'procedencia sin especificar'}\ndel ${cuando}`;
+        const aviso = useApi
+          ? "\n\nSe puede recuperar después con “Ver eliminados”."
+          : "\n\nEn este dispositivo el borrado no se puede deshacer.";
+        if(!confirm("¿Eliminar este registro?\n\n" + detalle + aviso)) return;
+
         if(useApi){
           try{
-            await fetch('/api/records/'+encodeURIComponent(id), {method:'DELETE'});
+            const res = await fetch('/api/records/'+encodeURIComponent(id), {
+              method:'DELETE',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ informador: state.currentUser || "" })
+            });
+            if(res.status === 401){
+              sesionIniciada = false;
+              volverAlLogin("Tu sesión venció. Vuelve a escribir la clave.");
+              return;
+            }
+            if(!res.ok) throw new Error('respuesta no OK del servidor');
           }catch(e){
+            // Antes se quitaba de la pantalla igual: la app decía "borrado"
+            // mientras el registro seguía en la base.
             console.error('No se pudo eliminar el registro en el servidor', e);
+            alert('No se pudo eliminar el registro: sin conexión con el servidor. Sigue estando ahí.');
+            return;
           }
         }
         state.records = state.records.filter(r=>r.id !== id);
