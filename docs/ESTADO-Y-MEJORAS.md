@@ -50,11 +50,21 @@ cierre del auto-seed y la corrección del XSS. Verificado en producción: el ún
 registro real (id 936) sigue intacto, no se coló ningún registro simulado y
 `seed-data.json` ya no se descarga.
 
-**Decisión de Julio:** subir primero y arreglar el resto después. Quedan
-abiertos de la auditoría del 2026-08-21 (informe en el Escritorio):
-**CN-001** (la API no pide autenticación), **CN-003** (`/api/import` abierto),
-**CN-004** (SheetJS 0.18.5 con CVE), **CN-005** (el servidor publica su propio
-código fuente) y los cinco hallazgos medios.
+**Segundo despliegue del mismo día — la API quedó cerrada.** Se resolvieron
+**CN-001** (clave de acceso + cookie de sesión firmada), **CN-002** (XSS),
+**CN-003** (`/api/import` ahora exige sesión) y **CN-006** (cabeceras de
+seguridad). Verificado contra producción: `records`, `custom`, `import` y
+`delete` responden 401 sin sesión.
+
+⚠️ **`APP_CLAVE` es obligatoria en Railway: sin ella el servidor no arranca.**
+Al desplegar, configurar la variable ANTES de subir el código.
+
+Siguen abiertos de la auditoría (informe en el Escritorio): **CN-004** (SheetJS
+0.18.5 con CVE conocidos, vendorizado, npm audit no lo ve), **CN-005** (el
+servidor publica su propio código fuente vía `express.static(__dirname)`),
+**CN-007** (`rejectUnauthorized:false`), **CN-008** (sin rate limit fuera del
+login), **CN-009** (sin validación de entrada en el servidor) y **CN-010**
+(borrado sin confirmación ni trazabilidad).
 
 **Pendiente aparte:** el `git push` a GitHub falló — el llavero de macOS tiene
 una credencial vencida. El commit está solo en local. (Se quitó del
