@@ -126,16 +126,13 @@
     border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(90deg,
-      #14150E 0%,
-      #14150E 46%,
-      #3D7317 52%,
-      #7DC040 58%,
-      #DCEFC5 62%,
-      #7DC040 68%,
-      #3D7317 73%,
-      #264E0E 80%,
-      #14150E 88%,
-      #14150E 100%);
+      #DCEFC5 0%,
+      #B9DE8E 18%,
+      #7DC040 38%,
+      #5A9A28 55%,
+      #3D7317 67%,
+      #264E0E 77%,
+      #14150E 88%);
   }
   .masthead::after{
     content:"";
@@ -144,21 +141,21 @@
     height:4px;
     background: var(--cobq-verde);
   }
-  .masthead .title-block{ min-width:0; max-width: 46%; }
+  .masthead .title-block{ min-width:0; max-width: 52%; }
   .masthead .title-block h1{
     font-family:'Fraunces', serif;
     font-optical-sizing:auto;
     font-weight:700;
     font-size: 2.5rem;
     line-height: 1.05;
-    /* Mostaza sobre el negro del degradado: 9,88 de contraste. */
-    color: var(--gold);
+    /* Negro: en este tramo el fondo es verde claro. El mostaza aquí daría 1,5. */
+    color: var(--ink);
     margin:0 0 6px;
     letter-spacing: 0.2px;
   }
   .masthead .title-block p{
     margin:0;
-    color: var(--gold);
+    color: var(--ink);
     font-weight: 600;
     font-size: 0.92rem;
     line-height: 1.3;
@@ -172,17 +169,15 @@
       padding: 16px 16px;
       gap: 10px;
       background: linear-gradient(90deg,
-        #14150E 0%,
-        #14150E 44%,
-        #3D7317 50%,
-        #7DC040 55%,
-        #B9DE8E 59%,
-        #7DC040 63%,
-        #3D7317 67%,
-        #14150E 72%,
-        #14150E 100%);
+        #DCEFC5 0%,
+        #B9DE8E 20%,
+        #7DC040 40%,
+        #5A9A28 53%,
+        #3D7317 61%,
+        #264E0E 68%,
+        #14150E 76%);
     }
-    .masthead .title-block{ max-width: 44%; }
+    .masthead .title-block{ max-width: 48%; }
     .masthead .title-block h1{ font-size: 1.72rem; }
     .masthead .title-block p{ font-size: 0.76rem; }
   }

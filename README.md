@@ -263,32 +263,28 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
   titular de la tarjeta destacada se cortaba a media palabra en pantallas
   angostas.
 
-- **(2026-08-21) Encabezado en degradado y letras mostaza**, pedido de Julio.
-  El encabezado recorre la escala verde completa y **se apaga en negro en los
-  dos extremos**. No es un capricho de composición: es la única forma de que
-  convivan las dos cosas que se pidieron.
+- **(2026-08-21) Encabezado en degradado**, pedido de Julio: un solo recorrido
+  de izquierda a derecha, del verde muy claro `#DCEFC5` al casi negro `#14150E`,
+  con el logo blanco sobre el extremo oscuro. Logo y título más grandes.
 
-  El mostaza `#F2B33D` (el mismo del "48,2%" de la tarjeta de motivo) **no se
-  lee sobre ningún verde de la escala**: 1,52 sobre `#DCEFC5`, 1,19 sobre el
-  oficial, 1,85 sobre `#5A9A28`. Solo aguanta desde `#264E0E` hacia abajo
-  (5,18) y sobre negro (9,88). Se probaron también mostazas más oscuros
-  (`#8A6A18`, `#7E6015`, `#6F5412`): ninguno pasa el recorrido completo, porque
-  el fondo va de muy claro a verde medio y un amarillo queda siempre en
-  luminancia intermedia. Por eso el texto va sobre el negro de la izquierda y el
-  logo blanco sobre el negro de la derecha, con la escala verde encendida al
-  centro.
+  **El texto va en negro, no en mostaza.** Se probó el mostaza `#F2B33D` (el del
+  "48,2%") y no se lee sobre ningún verde de la escala: 1,52 sobre `#DCEFC5`,
+  1,19 sobre el oficial, 1,85 sobre `#5A9A28`. Solo aguanta desde `#264E0E`
+  hacia abajo. Mostazas más oscuros (`#8A6A18`, `#7E6015`, `#6F5412`) tampoco
+  pasan el recorrido completo: el fondo va de muy claro a verde medio y un
+  amarillo queda siempre en luminancia intermedia. El mostaza sí quedó en la
+  **pestaña marcada**, que va sobre la arena negra (9,88).
 
-  **Cuidado al tocar las paradas del degradado:** son posiciones porcentuales y
-  los elementos ocupan porcentajes distintos según el ancho. En móvil, con las
-  paradas del escritorio, el logo caía sobre el verde claro y **se perdía**
-  (1,75 de contraste). Por eso el `@media (max-width: 620px)` lleva su propio
-  degradado, con el negro de vuelta antes de que empiece el logo. Si se cambian
-  las paradas hay que volver a medir en ambos anchos: medido con el degradado
-  pintado en un canvas y leyendo el píxel real bajo cada elemento, no a ojo.
+  **Cuidado al tocar las paradas:** son porcentajes, y los elementos ocupan
+  porcentajes distintos según el ancho. Con las paradas del escritorio, en móvil
+  el subtítulo caía a 3,98 (bajo el mínimo de 4,5 para texto pequeño) porque el
+  tramo claro terminaba antes que el texto. Por eso el `@media (max-width:620px)`
+  lleva su propio degradado, con el tramo claro alargado. Si se cambian, hay que
+  volver a medir en ambos anchos — y medirlo de verdad: pintando el degradado en
+  un canvas y leyendo el píxel real bajo cada elemento, punto por punto. A ojo
+  este error no se ve.
 
-  Resultado medido — escritorio: texto 9,57 / logo de 6,2 a 16,1. Móvil: texto
-  9,34 / logo 4,96 en su peor punto. La pestaña marcada también pasó al mostaza
-  (fondo `--gold`, texto `--ink`: 9,88).
+  Medido — escritorio: texto 5,74 / logo 8,0. Móvil: texto 6,32 / logo 7,78.
 
 - **(2026-08-21) Borrar deja de ser destructivo (CN-010)**. Antes, un toque en
   "Eliminar" hacía un `DELETE` físico e inmediato: el registro desaparecía para
