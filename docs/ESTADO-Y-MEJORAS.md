@@ -42,6 +42,30 @@ _Revisión hecha el 2026-08-21. Última vez que se tocó el proyecto: 2026-07-31
 5. **No hay respaldo de la base.** Si el Postgres de Railway se cae o se borra,
    no existe copia de los registros en ninguna otra parte.
 
+## 0. DESPLEGADO el 2026-08-21
+
+Se subió a producción (`railway up`, commit `486dfa5`) el gráfico de días de
+afluencia, la vista de procedencia por región, el arreglo de la escala, el
+cierre del auto-seed y la corrección del XSS. Verificado en producción: el único
+registro real (id 936) sigue intacto, no se coló ningún registro simulado y
+`seed-data.json` ya no se descarga.
+
+**Decisión de Julio:** subir primero y arreglar el resto después. Quedan
+abiertos de la auditoría del 2026-08-21 (informe en el Escritorio):
+**CN-001** (la API no pide autenticación), **CN-003** (`/api/import` abierto),
+**CN-004** (SheetJS 0.18.5 con CVE), **CN-005** (el servidor publica su propio
+código fuente) y los cinco hallazgos medios.
+
+**Pendiente aparte:** el `git push` a GitHub falló — el llavero de macOS tiene
+una credencial vencida. El commit está solo en local. (Se quitó del
+`~/.gitconfig` un credential helper que apuntaba a un `gh` inexistente y rompía
+el push en todos los repos; respaldo en `~/.gitconfig.respaldo-2026-08-21`.)
+
+**Para desplegar de nuevo:** la carpeta ya quedó enlazada al proyecto Railway
+`3ab72634-81da-4a3f-b502-c27096956c26`. El servicio NO está conectado a GitHub,
+así que se sube con `railway up` desde esta carpeta, verificando el ID en la
+misma invocación.
+
 ## 2 bis. Hecho después de esta revisión
 
 - **[2026-08-21] Gráfico "Días de mayor afluencia"** (pedido de Julio, hecho y
