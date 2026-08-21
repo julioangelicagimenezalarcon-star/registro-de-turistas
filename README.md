@@ -207,6 +207,49 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
+- **(2026-08-21) El color oficial pasa a ser el VERDE `#7DC040`**, por
+  indicación de Julio: la Municipalidad cambió su color institucional. Antes la
+  app se apoyaba en el azul `#1B4C8C`, que además ni siquiera era el azul
+  oficial — salía de `logo-cobquecura.jpg`, una versión del escudo distinta a
+  la vigente en municipalidadcobquecura.cl.
+
+  **El dato que ordenó todo el diseño:** `#7DC040` tiene **2,21 de contraste
+  sobre blanco** y **1,96 sobre el papel** de las tarjetas. Como texto sobre
+  claro es ilegible, y tampoco soporta texto blanco encima. Sobre oscuro, en
+  cambio, sube a **6,27**. Ese verde no es un color de fondo: es un color que
+  brilla sobre oscuro. De ahí sale la estructura:
+
+  | Variable | Valor | Dónde va |
+  |---|---|---|
+  | `--ink` | `#16330A` | fondo: el mismo tono llevado al extremo oscuro |
+  | `--cobq-verde` | `#7DC040` | oficial — solo sobre oscuro o como relleno |
+  | `--cobq-verde-600` | `#5A9A28` | barras de gráficos sobre papel (3,1) |
+  | `--cobq-verde-700` | `#3D7317` | texto y bordes sobre papel (5,1 — AA) |
+  | `--stamp` | `#A63D2F` | rojo sello SOBRE CLARO (5,6) |
+  | `--stamp-claro` | `#E8785F` | rojo sello SOBRE OSCURO (4,8) |
+
+  El dorado y el rojo sello se conservan: son lo que mantiene la identidad de
+  pasaporte. El fondo dejó de ser el teal `#12312B` —que era azulado y ya no
+  pegaba— y con él se limpiaron sus restos en sombras, degradados,
+  `theme-color` y `manifest.json`.
+
+  **El logo se recoloreó** (`tools/generar-logo-verde.py`): NO es un logo plano
+  sobre blanco sino una imagen circular con una foto de agua y el texto calado
+  en blanco. El primer intento lo trató como monocromo y dejó el texto
+  transparente. Lo que funciona es desplazar el TONO de los píxeles azules
+  (175°–265°) a 88°, dejando intactos los de baja saturación —el texto— y la
+  franja verde, que ya estaba en `#78C030`, casi el oficial. El original azul
+  quedó en `tools/logo-original-azul.jpg` y ya no se publica.
+
+  Verificado con una auditoría de contraste sobre la app corriendo, midiendo
+  cada texto contra el fondo que realmente tiene detrás (incluidos degradados):
+  **0 incumplimientos** de WCAG AA en las tres pestañas.
+
+  De paso se corrigieron dos defectos de maquetación que el cambio dejó a la
+  vista: el badge `#1 …` se montaba sobre el título de los gráficos ("Días de
+  mayor afl~encia") y el titular de la tarjeta destacada se cortaba a media
+  palabra en pantallas angostas.
+
 - **(2026-08-21) Borrar deja de ser destructivo (CN-010)**. Antes, un toque en
   "Eliminar" hacía un `DELETE` físico e inmediato: el registro desaparecía para
   todos, sin preguntar, sin deshacer y sin dejar rastro de quién lo hizo. En un

@@ -4,8 +4,8 @@
   "description": "Registro de turistas de la I. Municipalidad de Cobquecura",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#12312B",
-  "theme_color": "#12312B",
+  "background_color": "#16330A",
+  "theme_color": "#16330A",
   "orientation": "portrait-primary",
   "icons": [
     {

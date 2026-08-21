@@ -719,7 +719,10 @@
   });
 
   // ---------- Panel / dashboard (Chart.js) ----------
-  const PALETTE = ["#1B4C8C","#6FAE32","#A63D2F","#C99A3E","#2E6DB4","#8B4F3E","#6B6558","#D9B863","#3E6B4F","#9C6B4F"];
+  // Serie de los gráficos. Encabeza el verde institucional, en el paso 600 que
+  // sí contrasta sobre el papel de las tarjetas (el oficial #7DC040 queda en
+  // 1,96 sobre papel: sirve de relleno decorativo, no para distinguir series).
+  const PALETTE = ["#5A9A28","#C99A3E","#A63D2F","#3D7317","#8B4F3E","#6B6558","#D9B863","#9C6B4F","#264E0E","#B9DE8E"];
   const chartInstances = {};
 
   const hasChart = typeof Chart !== 'undefined';
@@ -768,7 +771,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "700 1.5rem 'IBM Plex Mono', monospace";
-      ctx.fillStyle = "#12312B";
+      ctx.fillStyle = "#16330A";
       ctx.fillText(chart.config._centerText.value, cx, cy - 8);
       ctx.font = "600 0.7rem 'IBM Plex Sans', sans-serif";
       ctx.fillStyle = "#6B6558";
@@ -872,14 +875,14 @@
         labels,
         datasets: [{
           data: values,
-          borderColor: "#1B4C8C",
+          borderColor: "#3D7317",
           borderWidth: 2.5,
           pointRadius: 0,
           pointHoverRadius: 4,
-          pointHoverBackgroundColor: "#1B4C8C",
+          pointHoverBackgroundColor: "#3D7317",
           tension: 0.35,
           fill: true,
-          backgroundColor: "rgba(27,76,140,0.14)"
+          backgroundColor: "rgba(61,115,23,0.14)"
         }]
       },
       options: {
@@ -973,7 +976,7 @@
     // Colores ESTÁTICOS, nunca funciones 'scriptable': Chart.js crasheaba el
     // Panel completo en Safari/iOS con colores calculados por callback
     // (ver README §6 y el fix del 2026-07-31). El día peak va en dorado.
-    const colors = totales.map(v => (max > 0 && v === max) ? "#C99A3E" : "#2E6DB4");
+    const colors = totales.map(v => (max > 0 && v === max) ? "#C99A3E" : "#5A9A28");
     chartInstances[canvasId] = new Chart(ctx, {
       type: "bar",
       data: { labels: DIAS_SEMANA_CORTO, datasets: [{
