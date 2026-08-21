@@ -176,7 +176,7 @@
   const loginUserSelect = $("login-user");
 
   function populateLoginUsers(){
-    loginUserSelect.innerHTML = PERSONAL.map(p=>`<option value="${escapeAttr(p)}">${p}</option>`).join("");
+    loginUserSelect.innerHTML = PERSONAL.map(p=>`<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join("");
   }
 
   function enterApp(userName){
@@ -302,7 +302,7 @@
       panel.innerHTML = options.map(o=>`
         <label class="dropdown-option">
           <input type="checkbox" value="${escapeAttr(o)}" ${selectedSet.has(o)?'checked':''}>
-          <span>${o}</span>
+          <span>${escapeHtml(o)}</span>
         </label>
       `).join("");
       panel.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
@@ -357,7 +357,7 @@
   function renderServiciosChips(){
     const servicios = [...DEFAULT_SERVICIOS, ...state.serviciosCustom];
     $("servicios-chips").innerHTML = servicios.map(s=>
-      `<div class="chip ${selectedServicios.has(s)?'selected':''}" data-val="${escapeAttr(s)}" data-group="servicio">${s}</div>`
+      `<div class="chip ${selectedServicios.has(s)?'selected':''}" data-val="${escapeAttr(s)}" data-group="servicio">${escapeHtml(s)}</div>`
     ).join("");
     document.querySelectorAll('.chip[data-group="servicio"]').forEach(c=>{
       c.addEventListener("click", ()=>{
@@ -699,6 +699,18 @@
     chartInstances[canvasId] = chart;
   }
 
+  // Tope del eje X para los gráficos de %. Antes estaba fijo en 100, así que un
+  // gráfico cuya barra más alta era 11% dejaba el 89% del ancho vacío y ninguna
+  // barra se podía comparar con otra. Ahora se ajusta al dato, subiendo al
+  // siguiente corte "redondo" para que el eje siga siendo fácil de leer.
+  const CORTES_PCT = [5,10,15,20,25,30,35,40,50,60,75,100];
+  function escalaPct(percents){
+    const max = percents.length ? Math.max.apply(null, percents) : 0;
+    const holgado = max * 1.05;
+    for(const c of CORTES_PCT){ if(c >= holgado) return c; }
+    return 100;
+  }
+
   function makePercentBar(canvasId, entries, denom, colorOffset){
     if(!hasChart) return;
     destroyChart(canvasId);
@@ -719,7 +731,7 @@
         indexAxis: "y",
         responsive:true, maintainAspectRatio:false,
         scales: {
-          x: { min:0, max: Math.max(100, ...percents), ticks:{ callback:(v)=>v+"%" }, grid:{ color:"rgba(34,32,27,0.08)" } },
+          x: { min:0, max: escalaPct(percents), ticks:{ callback:(v)=>v+"%" }, grid:{ color:"rgba(34,32,27,0.08)" } },
           y: { grid:{ display:false } }
         },
         plugins:{
@@ -778,6 +790,111 @@
           tooltip:{ callbacks:{
             title: (items)=> allDates[items[0].dataIndex] ? parseLocalDate(allDates[items[0].dataIndex]).toLocaleDateString('es-ES',{weekday:'long', day:'2-digit', month:'long'}) : "",
             label: (c)=> `${c.raw.toLocaleString('es-CL')} turistas`
+          }}
+        }
+      }
+    });
+  }
+
+  // ---------- Procedencia: región ⇄ comuna ----------
+  // Con una temporada completa hay más de 120 comunas distintas y la mitad
+  // aparece una sola vez: la vista por comuna sola es ilegible. Por defecto se
+  // agrupa por región (12 barras que cubren el 100%) y el detalle fino queda a
+  // un clic, porque son dos preguntas distintas: "dónde promociono" y "quién
+  // exactamente está viniendo".
+  let procedenciaVista = "region";   // "region" | "comuna"
+
+  // Un par de nombres oficiales no caben como etiqueta y aplastan el gráfico.
+  const REGION_CORTA = {
+    "Metropolitana de Santiago": "R. Metropolitana",
+    "Magallanes y de la Antártica Chilena": "Magallanes"
+  };
+
+  function procedenciaPorRegion(recs){
+    const conteo = {};
+    recs.forEach(r=>{
+      // Un turista de afuera no tiene región chilena: se agrupa como "Extranjero".
+      const clave = (r.pais && r.pais !== "Chile") ? "Extranjero" : (r.region || "Sin especificar");
+      conteo[clave] = (conteo[clave]||0) + 1;
+    });
+    return Object.entries(conteo)
+      .map(([k,v])=> [REGION_CORTA[k] || k, v])
+      .sort((a,b)=>b[1]-a[1]);
+  }
+
+  // El gráfico muestra las N comunas principales. El resto NO se recorta en
+  // silencio: se declara aparte, como nota bajo el gráfico. Se probó ponerlo
+  // como una barra más ("Otras 112 comunas"), pero al ser un agregado del 56%
+  // aplastaba a las comunas reales — justo lo que la vista quiere comparar.
+  const PROC_TOP_N = 12;
+
+  // ---------- Días de mayor afluencia ----------
+  // Responde "¿qué días llega más gente al pueblo?". Es distinto del flujo
+  // diario (que es la línea de tiempo): acá se agrupan todos los registros por
+  // día de la semana, para ver el patrón que se repite temporada a temporada.
+  const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+  const DIAS_SEMANA_CORTO = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+
+  // Lunes = 0 ... Domingo = 6 (getDay() nativo devuelve Domingo = 0).
+  // Devuelve -1 si la fecha no se puede interpretar, para no ensuciar los totales.
+  function weekdayIndex(fecha){
+    const d = parseLocalDate(fecha);
+    if(isNaN(d.getTime())) return -1;
+    return (d.getDay() + 6) % 7;
+  }
+
+  // Totales por día de la semana + cuántas jornadas distintas se registraron de
+  // cada uno. Las jornadas importan: un rango de fechas casi nunca tiene la
+  // misma cantidad de sábados que de lunes, así que el total solo no basta.
+  function weekdayStats(recs){
+    const totales = [0,0,0,0,0,0,0];
+    const jornadas = [new Set(),new Set(),new Set(),new Set(),new Set(),new Set(),new Set()];
+    recs.forEach(r=>{
+      if(!r.fecha) return;
+      const i = weekdayIndex(r.fecha);
+      if(i < 0) return;
+      totales[i] += r.total;
+      jornadas[i].add(r.fecha);
+    });
+    return { totales, jornadas: jornadas.map(set=>set.size) };
+  }
+
+  function makeDiaSemanaChart(canvasId, recs){
+    if(!hasChart) return;
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if(!ctx) return;
+    const { totales, jornadas } = weekdayStats(recs);
+    const max = Math.max.apply(null, totales);
+    // Colores ESTÁTICOS, nunca funciones 'scriptable': Chart.js crasheaba el
+    // Panel completo en Safari/iOS con colores calculados por callback
+    // (ver README §6 y el fix del 2026-07-31). El día peak va en dorado.
+    const colors = totales.map(v => (max > 0 && v === max) ? "#C99A3E" : "#2E6DB4");
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: "bar",
+      data: { labels: DIAS_SEMANA_CORTO, datasets: [{
+        data: totales,
+        backgroundColor: colors,
+        borderRadius: 6,
+        maxBarThickness: 54
+      }] },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        scales: {
+          x: { grid:{ display:false } },
+          y: { beginAtZero:true, grid:{ color:"rgba(34,32,27,0.08)" }, ticks:{ precision:0 } }
+        },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{
+            title: (items)=> DIAS_SEMANA[items[0].dataIndex],
+            label: (c)=> `${c.raw.toLocaleString('es-CL')} turistas en total`,
+            afterLabel: (c)=>{
+              const j = jornadas[c.dataIndex];
+              if(!j) return "Sin jornadas registradas";
+              const prom = (c.raw / j).toLocaleString('es-CL', {maximumFractionDigits:1});
+              return `Promedio ${prom} por jornada · ${j} ${j===1?'día registrado':'días registrados'}`;
+            }
           }}
         }
       }
@@ -846,11 +963,26 @@
     const topMotivos = Object.entries(motivoCount).sort((a,b)=>b[1]-a[1]);
     const topProcedencias = Object.entries(procedenciaCount).sort((a,b)=>b[1]-a[1]);
 
+    // Afluencia: patrón por día de la semana + las fechas peak de la temporada.
+    const { totales: diaTotales } = weekdayStats(recs);
+    const maxDiaTotal = Math.max.apply(null, diaTotales);
+    const topDiaSemana = maxDiaTotal > 0 ? DIAS_SEMANA[diaTotales.indexOf(maxDiaTotal)] : "";
+    const turistasPorFecha = {};
+    recs.forEach(r=>{ if(r.fecha) turistasPorFecha[r.fecha] = (turistasPorFecha[r.fecha]||0) + r.total; });
+    const topFechas = Object.entries(turistasPorFecha).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const maxFechaTotal = topFechas.length ? topFechas[0][1] : 0;
+
     const fechas = recs.map(r=>r.fecha).filter(Boolean).sort();
     const rangeLabel = fechas.length ? (
       parseLocalDate(fechas[0]).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}) + " — " +
       parseLocalDate(fechas[fechas.length-1]).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})
     ) : "";
+
+    const procRegion = procedenciaPorRegion(recs);
+    const procComuna = topProcedencias.slice(0, PROC_TOP_N);
+    const procResto = topProcedencias.slice(PROC_TOP_N);
+    const procRestoRegistros = procResto.reduce((acc,e)=>acc+e[1], 0);
+    const procDatos = { region: procRegion, comuna: procComuna };
 
     const topMotivo = topMotivos[0];
     const topMotivoPct = topMotivo ? pct(topMotivo[1], numRegistros) : "0.0";
@@ -887,6 +1019,25 @@
           <p class="chart-denom">Personas registradas por día durante la temporada</p>
           <div class="chart-box flujo"><canvas id="chart-flujo"></canvas></div>
         </div>
+        <div class="chart-card wide">
+          ${topDiaSemana ? `<span class="rank-badge">#1 ${escapeHtml(topDiaSemana)}</span>` : ""}
+          <h3>Días de mayor afluencia</h3>
+          <p class="chart-denom">Turistas registrados según el día de la semana — muestra qué días llega más gente a la comuna</p>
+          <div class="afluencia-body">
+            <div class="chart-box"><canvas id="chart-dia-semana"></canvas></div>
+            <div class="peak-days">
+              <div class="peak-title">Fechas peak</div>
+              ${topFechas.length ? `<ol class="peak-list">
+                ${topFechas.map(([f,v],i)=>`<li>
+                  <span class="peak-rank">${i+1}</span>
+                  <span class="peak-date">${escapeHtml(parseLocalDate(f).toLocaleDateString('es-ES',{weekday:'short', day:'2-digit', month:'short'}))}</span>
+                  <span class="peak-bar"><span style="width:${maxFechaTotal ? (v/maxFechaTotal*100).toFixed(1) : 0}%"></span></span>
+                  <span class="peak-val">${v.toLocaleString('es-CL')}</span>
+                </li>`).join("")}
+              </ol>` : `<p class="peak-empty">Aún no hay fechas con registros.</p>`}
+            </div>
+          </div>
+        </div>
         <div class="chart-card">
           <h3>Género</h3>
           <p class="chart-denom">% del total de turistas</p>
@@ -904,10 +1055,15 @@
           <div class="chart-box tall"><canvas id="chart-motivo"></canvas></div>
         </div>
         <div class="chart-card">
-          <span class="rank-badge">#1 ${escapeHtml(topProcedencias[0] ? topProcedencias[0][0] : "")}</span>
+          <span class="rank-badge" id="proc-badge"></span>
           <h3>Procedencia</h3>
-          <p class="chart-denom">% de los registros</p>
-          <div class="chart-box tall"><canvas id="chart-procedencia"></canvas></div>
+          <p class="chart-denom" id="proc-denom"></p>
+          <div class="viewtabs" id="proc-viewtabs">
+            <button type="button" data-view="region">Región</button>
+            <button type="button" data-view="comuna">Comuna</button>
+          </div>
+          <div class="chart-box taller"><canvas id="chart-procedencia"></canvas></div>
+          <p class="chart-nota" id="proc-nota"></p>
         </div>
         <div class="chart-card wide">
           <span class="rank-badge">#1 ${escapeHtml(topAtractivos[0] ? topAtractivos[0][0] : "")}</span>
@@ -930,10 +1086,38 @@
     });
 
     makeFlujoChart("chart-flujo", recs);
+    makeDiaSemanaChart("chart-dia-semana", recs);
     makeDoughnut("chart-genero", generoData, totalTuristas);
     makePercentBar("chart-edad", Object.entries(edades), totalEdades, 3);
     makePercentBar("chart-motivo", topMotivos, numRegistros, 1);
-    makePercentBar("chart-procedencia", topProcedencias, numRegistros, 0);
+    function pintarProcedencia(){
+      const entries = procDatos[procedenciaVista];
+      makePercentBar("chart-procedencia", entries, numRegistros, 0);
+      const badge = $("proc-badge");
+      const denom = $("proc-denom");
+      if(badge) badge.textContent = entries[0] ? "#1 " + entries[0][0] : "";
+      if(denom) denom.textContent = procedenciaVista === "region"
+        ? "% de los registros — agrupado por región de origen"
+        : `% de los registros — las ${PROC_TOP_N} comunas principales`;
+      const nota = $("proc-nota");
+      if(nota){
+        if(procedenciaVista === "comuna" && procResto.length){
+          nota.textContent = `Fuera del gráfico: otras ${procResto.length.toLocaleString('es-CL')} procedencias suman ${procRestoRegistros.toLocaleString('es-CL')} registros (${pct(procRestoRegistros, numRegistros).replace(".", ",")}% del total).`;
+        } else {
+          nota.textContent = "";
+        }
+      }
+      el.querySelectorAll("#proc-viewtabs button").forEach(b=>{
+        b.classList.toggle("active", b.dataset.view === procedenciaVista);
+      });
+    }
+    el.querySelectorAll("#proc-viewtabs button").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        procedenciaVista = b.dataset.view;
+        pintarProcedencia();
+      });
+    });
+    pintarProcedencia();
     makePercentBar("chart-atractivos", topAtractivos, numRegistros, 2);
     makePercentBar("chart-servicios", topServicios, numRegistros, 4);
   }
@@ -952,7 +1136,7 @@
       const d = parseLocalDate(r.fecha);
       const dd = isNaN(d) ? r.fecha : d.toLocaleDateString('es-ES', {day:'2-digit', month:'short'});
       return `
-      <div class="record-card" data-id="${r.id}">
+      <div class="record-card" data-id="${escapeAttr(r.id)}">
         <div class="record-top">
           <div class="record-badge">${dd}</div>
           <div class="record-main">
@@ -963,7 +1147,7 @@
               ${(r.servicios||[]).map(s=>`<span class="tag">${escapeHtml(s)}</span>`).join("")}
             </div>
           </div>
-          <button class="del-btn" data-id="${r.id}">Eliminar</button>
+          <button class="del-btn" data-id="${escapeAttr(r.id)}">Eliminar</button>
         </div>
       </div>`;
     }).join("");
@@ -1115,38 +1299,36 @@
     }
   }
 
+  // ¿Estamos en un ambiente de pruebas? Los datos simulados NUNCA pueden entrar
+  // a la base compartida ni aparecerle a un informador en terreno: quedarían
+  // indistinguibles de los registros reales y no hay forma de separarlos después.
+  function esAmbienteLocal(){
+    const h = location.hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "" || h.endsWith(".local");
+  }
+
   async function bootstrap(){
-    const forceSeed = new URLSearchParams(location.search).get('seed') === '1';
+    const pideSeed = new URLSearchParams(location.search).get('seed') === '1';
 
     if(!hasNativeStorage){
-      // Standalone deploy (Railway): try the shared API first. Only auto-seed
-      // when the shared database is genuinely empty -- never on ?seed=1 alone,
-      // to avoid ever duplicating real field data captured by encuestadores.
       try{
         const recRes = await fetch('/api/records');
         if(recRes.ok){
-          const recData = await recRes.json();
-          if((recData.records || []).length === 0){
-            try{
-              const seedRes = await fetch('seed-data.json');
-              const seed = await seedRes.json();
-              await fetch('/api/import', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({records: seed.records})
-              });
-            }catch(e){
-              console.error('[Registro de Turistas] No se pudo cargar el set de datos de demostración.', e);
-            }
-          }
+          // Con base compartida no se siembra NADA, ni aunque esté vacía.
+          // Antes acá se auto-importaba el set de demostración cuando la base
+          // devolvía 0 registros: bastaba que alguien borrara el último registro
+          // real para llenar producción de datos falsos.
           loadState();
           return;
         }
       }catch(e){
-        // API not reachable (e.g. GitHub Pages, sin servidor) -- fall through to localStorage below
+        // Sin API (hosting estático o sin conexión): sigue con localStorage.
       }
     }
 
-    if(forceSeed || !(await hasExistingData())){
+    // El set de demostración solo existe en local. En cualquier otro host la app
+    // parte vacía, como corresponde.
+    if(esAmbienteLocal() && (pideSeed || !(await hasExistingData()))){
       try{
         const res = await fetch('seed-data.json');
         const seed = await res.json();

@@ -109,7 +109,10 @@ elegido, sin tocar el resto de la lógica de la app (que solo llama a
 - **Panel** (`#panel-panel`): dashboard con gráficos Chart.js — dona de
   género, barras horizontales de % para edad, motivo, procedencia,
   atractivos y servicios. Todo se recalcula en vivo desde los registros
-  guardados.
+  guardados. Incluye además dos vistas temporales: **Flujo diario de
+  turistas** (línea de área por fecha, la temporada completa) y **Días de
+  mayor afluencia** (barras por día de la semana + ranking de las 5 fechas
+  peak) — ver sección 8.
 - **Historial** (`#panel-historial`): lista de todos los registros con
   opción de eliminar, más dos botones de exportación:
   - **Exportar CSV**: exporta los datos crudos.
@@ -189,6 +192,85 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
       apariencia de app pero no funcionamiento sin internet garantizado).
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
+
+- **(2026-08-21) Escala de los gráficos de % y Procedencia región ⇄ comuna**:
+  Julio reportó que el gráfico de Procedencia era ilegible. Eran dos cosas.
+
+  **(a) La escala estaba clavada en 100%.** `makePercentBar()` fijaba el eje X
+  con `Math.max(100, ...)`, así que un gráfico cuya barra más alta era 11,2%
+  dejaba el 89% del ancho vacío — y afectaba a los cinco gráficos de barras, no
+  solo a Procedencia. Ahora `escalaPct()` sube al siguiente corte redondo sobre
+  el dato real (Procedencia por comuna pasó de 0-100% a 0-15%; motivo a 0-60%;
+  edad a 0-35%). Se usan cortes fijos y no el máximo exacto para que el eje siga
+  siendo fácil de leer.
+
+  **(b) 124 procedencias distintas en 280 px**, 44 de ellas con un solo
+  registro — y esto no es un artefacto de la simulación: con datos reales serán
+  más comunas todavía. La tarjeta ahora abre agrupada **por región** (12 barras
+  que cubren el 100% de los registros) con un selector para ver el detalle **por
+  comuna**. Son dos preguntas distintas: dónde promocionar, y quién exactamente
+  está viniendo. Estado en `procedenciaVista`, funciones
+  `procedenciaPorRegion()` y `pintarProcedencia()`.
+
+  El detalle por comuna muestra las 12 principales. Lo que queda fuera **no se
+  recorta en silencio**: va como nota bajo el gráfico ("otras 112 procedencias
+  suman 699 registros, 56,1% del total"). Se probó ponerlo como una barra más
+  —"Otras 112 comunas"— pero al ser un agregado del 56% aplastaba a las comunas
+  reales, que es justo lo que la vista quiere comparar.
+
+  Ojo con `pct()`: su resultado también se parsea con `parseFloat` en los KPI
+  del Panel, así que devuelve el decimal con **punto**. Si se necesita coma para
+  mostrar, se convierte en el punto de uso — no dentro de `pct()`.
+
+- **(2026-08-21) Temporada alta simulada (`tools/generar-seed-temporada.py`)**:
+  la app se estrena en terreno en la temporada **dic-2026 → mar-2027** y hasta
+  entonces la base real está casi vacía (1 registro), así que el Panel no se
+  podía evaluar ni mostrar. El seed pasó a generarse con un script
+  **determinista** (semilla fija: mismo script → mismo archivo, verificado por
+  sha256) en vez de ser un JSON opaco, para poder ajustar los supuestos y
+  regenerar. Reemplazó a la simulación anterior (932 registros, dic-2025 →
+  feb-2026), respaldada en `tools/seed-data.ANTERIOR.json`.
+
+  Lo que modela: estacionalidad por tramos (Año Nuevo y Fiesta de la Candelaria
+  como los dos peaks duros, marzo apagado por la vuelta a clases), efecto fin de
+  semana —atenuado en pleno enero, porque el que está de vacaciones pasea igual
+  un martes—, tipos de grupo (familia / pareja / amigos / solo / tour) con su
+  propia composición de edad y sexo, procedencia dominada por Ñuble y Biobío
+  (Chillán es la comuna #1), ~9% de extranjeros con Argentina a la cabeza, y
+  Surf ~16% de los registros concentrado en Buchupureo.
+
+  Reglas que el generador respeta y que conviene no romper:
+  * **Toda comuna sale de `tools/comunas-chile.json`**, extraído del propio
+    `CHILE_REGIONES` de `app.js`. Si una comuna no está en el selector de la
+    app, no puede estar en los datos — el script lo verifica con un `assert`.
+  * **Cada registro lleva `id` con prefijo `sim-`.** Es la marca que distingue
+    un registro simulado de uno real, y tiene que ser imposible de confundir.
+  * `femenino + masculino == total` y la suma de los 5 rangos de edad `== total`,
+    igual que exige el formulario.
+
+  Supuesto declarado: la Fiesta de la Candelaria se modela en su fecha
+  litúrgica, el **2 de febrero** — no se verificó contra el calendario real de
+  la Municipalidad.
+
+  ⚠️ **Estos datos no se cargan nunca contra la base de producción.** Ver el
+  riesgo del auto-seed en `docs/ESTADO-Y-MEJORAS.md` §2.
+
+- **(2026-08-21) Gráfico "Días de mayor afluencia"**: pedido explícito de
+  Julio. Es distinto del "Flujo diario" que ya existía: el flujo es la línea
+  de tiempo (qué pasó cada fecha), mientras que este agrupa **todos** los
+  registros por día de la semana, para ver el patrón que se repite —
+  la pregunta útil para decidir turnos de informadores y para que los
+  negocios locales sepan qué días conviene abrir. La tarjeta trae dos cosas:
+  barras Lun→Dom con el **total de turistas** (el día peak se pinta en
+  dorado `#C99A3E`, el resto en azul municipal `#2E6DB4`) y, al lado, un
+  ranking de las **5 fechas peak** de la temporada con su fecha exacta.
+  El tooltip agrega el **promedio por jornada** y cuántas jornadas de ese
+  día se registraron, porque un rango de fechas casi nunca tiene la misma
+  cantidad de sábados que de lunes y el total solo puede engañar.
+  Funciones nuevas en `app.js`: `weekdayIndex()`, `weekdayStats()` y
+  `makeDiaSemanaChart()`. **Los colores son estáticos a propósito** (array
+  precalculado, nunca callbacks 'scriptable') — es la misma trampa que
+  rompía el Panel en Safari/iOS el 2026-07-31.
 
 - **Login (2026-07-14)**: se pidió explícitamente como selector de nombre
   sin contraseña (no es autenticación real, ver pendientes). El nombre

@@ -608,8 +608,82 @@
     color: var(--muted);
     margin: 0 0 10px;
   }
+  /* Días de mayor afluencia: gráfico semanal + ranking de fechas peak */
+  .afluencia-body{
+    display:grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  @media (max-width: 720px){ .afluencia-body{ grid-template-columns: 1fr; } }
+  .peak-days{
+    background: rgba(27,76,140,0.05);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .peak-title{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 0.88rem;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+  .peak-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .peak-list li{
+    display:grid;
+    grid-template-columns: 14px 76px 1fr auto;
+    align-items:center;
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+  .peak-rank{ font-family:'IBM Plex Mono', monospace; font-weight:600; color: var(--muted); }
+  .peak-date{ font-weight:600; color: var(--charcoal); text-transform: capitalize; }
+  .peak-bar{ height:6px; border-radius:999px; background: rgba(34,32,27,0.10); overflow:hidden; }
+  .peak-bar > span{ display:block; height:100%; border-radius:999px; background: var(--cobq-blue); }
+  .peak-val{ font-family:'IBM Plex Mono', monospace; font-weight:600; color: var(--cobq-blue); }
+  .peak-empty{ font-size:0.78rem; color: var(--muted); margin:0; }
+
   .chart-box{ position:relative; height: 230px; min-width: 0; }
   .chart-box.tall{ height: 280px; }
+  .chart-box.taller{ height: 330px; }
+
+  /* Nota al pie de un gráfico: lo que queda fuera, dicho explícitamente */
+  .chart-nota{
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin: 8px 0 2px;
+    line-height: 1.45;
+  }
+
+  /* Selector de vista dentro de una tarjeta (Procedencia: región ⇄ comuna) */
+  .viewtabs{
+    display:inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow:hidden;
+    margin: 0 0 12px;
+    background:#fff;
+  }
+  .viewtabs button{
+    appearance:none;
+    border:0;
+    background:transparent;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 0.72rem;
+    font-weight:600;
+    color: var(--muted);
+    padding: 5px 15px;
+    cursor:pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .viewtabs button.active{ background: var(--cobq-blue); color:#fff; }
+  /* En terreno esto se toca con el dedo: en pantalla chica el botón crece. */
+  @media (max-width: 720px){
+    .viewtabs button{ padding: 9px 18px; font-size: 0.76rem; }
+  }
+  .viewtabs button:not(.active):hover{ background: rgba(27,76,140,0.07); color: var(--ink); }
   .chart-box.flujo{ height: 260px; }
 
   .legend-total{
