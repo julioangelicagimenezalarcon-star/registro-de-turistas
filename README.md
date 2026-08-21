@@ -207,6 +207,25 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
+- **(2026-08-21) El Historial se agrupa por día**, pedido de Julio: la lista
+  corrida era imposible de recorrer con una temporada completa encima.
+
+  Ahora se listan los días —fecha, cantidad de registros y total de turistas— y
+  cada uno se despliega al pincharlo. El más reciente se abre solo, que casi
+  siempre es lo que se viene a ver.
+
+  **Cada día pinta sus registros SOLO al abrirse** (`abrirDia()` marca el cuerpo
+  con `dataset.pintado`). No es un detalle de rendimiento menor: antes se
+  dibujaban las 1.246 tarjetas de una vez en cada render; ahora el DOM arranca
+  con 92 cabeceras y 4 tarjetas. Esto importa en los teléfonos con los que se
+  usa la app en terreno.
+
+  Los listeners de "Eliminar" ya no se enganchan con un
+  `document.querySelectorAll` global: `engancharBorrado(contenedor)` los asigna
+  solo dentro del día que se acaba de pintar. Si se vuelve a un render global,
+  hay que mantener esa separación o los días abiertos después quedarán sin
+  listener.
+
 - **(2026-08-21) Identidad visual: el paisaje de Cobquecura**. La Municipalidad
   cambió su color oficial al **verde `#7DC040`**, y Julio entregó el logo
   institucional real y el contexto de marca: blanco y negro permitidos, y una

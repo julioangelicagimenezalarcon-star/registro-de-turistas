@@ -743,6 +743,58 @@
     margin: 14px 0 0;
   }
 
+  /* Historial agrupado por día */
+  .dia-grupo{
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .dia-cabecera{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 13px 15px;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'IBM Plex Sans', sans-serif;
+    transition: background .14s ease;
+  }
+  .dia-cabecera:hover{ background: var(--paper-2); }
+  .dia-flecha{
+    color: var(--cobq-verde-700);
+    font-size: 0.9rem;
+    flex: none;
+    transition: transform .16s ease;
+  }
+  .dia-grupo.abierto .dia-flecha{ transform: rotate(90deg); }
+  .dia-fecha{
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--charcoal);
+    flex: 1;
+    min-width: 0;
+  }
+  .dia-conteo{
+    font-size: 0.74rem;
+    color: var(--cobq-verde-700);
+    font-weight: 600;
+    flex: none;
+    white-space: nowrap;
+  }
+  .dia-cuerpo{ display: none; padding: 0 12px 12px; }
+  .dia-grupo.abierto .dia-cuerpo{ display: block; }
+  @media (max-width: 560px){
+    /* La flecha se queda junto a la fecha; lo que baja de línea es el conteo. */
+    .dia-cabecera{ flex-wrap: wrap; gap: 4px 10px; }
+    .dia-fecha{ flex: 1 1 auto; font-size: 0.84rem; }
+    .dia-conteo{ flex: 1 1 100%; margin-left: 24px; }
+  }
+
   /* Registros eliminados (recuperables) */
   .eliminados-caja{
     background: rgba(166,61,47,0.05);

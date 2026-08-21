@@ -1312,22 +1312,16 @@
   });
 
   // ---------- Historial ----------
-  function renderHistorial(){
-    const el = $("historial-list");
-    if(state.records.length === 0){
-      el.innerHTML = `<div class="empty-state">
-        <div class="stamp-outline">◎</div>
-        <p>No hay registros todavía.</p>
-      </div>`;
-      return;
-    }
-    el.innerHTML = state.records.map(r=>{
-      const d = parseLocalDate(r.fecha);
-      const dd = isNaN(d) ? r.fecha : d.toLocaleDateString('es-ES', {day:'2-digit', month:'short'});
-      return `
+  // ---------- Historial agrupado por día ----------
+  // Con una temporada completa son más de mil registros: la lista corrida era
+  // imposible de recorrer y además dibujaba las mil tarjetas de una vez. Ahora
+  // se listan los días y cada uno pinta sus registros SOLO al abrirse.
+  const diasAbiertos = new Set();
+
+  function tarjetaRegistro(r){
+    return `
       <div class="record-card" data-id="${escapeAttr(r.id)}">
         <div class="record-top">
-          <div class="record-badge">${dd}</div>
           <div class="record-main">
             <div class="proc">${escapeHtml(r.procedencia)}</div>
             <div class="meta">${r.total} turistas (${r.femenino} F · ${r.masculino} M) — ${escapeHtml(r.motivo)}${r.informador ? " · registrado por " + escapeHtml(r.informador) : ""}</div>
@@ -1339,16 +1333,24 @@
           <button class="del-btn" data-id="${escapeAttr(r.id)}">Eliminar</button>
         </div>
       </div>`;
-    }).join("");
+  }
 
-    document.querySelectorAll(".del-btn").forEach(btn=>{
+  function nombreDelDia(fecha){
+    const d = parseLocalDate(fecha);
+    if(isNaN(d.getTime())) return fecha;
+    const t = d.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function engancharBorrado(contenedor){
+    contenedor.querySelectorAll(".del-btn").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
         const id = btn.dataset.id;
         const reg = state.records.find(r=>r.id === id);
         if(!reg) return;
 
-        // Antes bastaba un toque para destruir el registro de todos. Ahora se
-        // confirma mostrando de cuál se trata, no un "¿estás seguro?" a ciegas.
+        // Se confirma mostrando de cuál registro se trata, no un "¿estás
+        // seguro?" a ciegas.
         const cuando = reg.fecha ? parseLocalDate(reg.fecha).toLocaleDateString('es-ES',{day:'2-digit', month:'long', year:'numeric'}) : reg.fecha;
         const detalle = `${reg.total} turista${reg.total===1?'':'s'} de ${reg.procedencia || 'procedencia sin especificar'}\ndel ${cuando}`;
         const aviso = useApi
@@ -1370,8 +1372,8 @@
             }
             if(!res.ok) throw new Error('respuesta no OK del servidor');
           }catch(e){
-            // Antes se quitaba de la pantalla igual: la app decía "borrado"
-            // mientras el registro seguía en la base.
+            // Si el servidor no lo acepta, la vista NO se toca: antes decía
+            // "borrado" con el registro intacto en la base.
             console.error('No se pudo eliminar el registro en el servidor', e);
             alert('No se pudo eliminar el registro: sin conexión con el servidor. Sigue estando ahí.');
             return;
@@ -1382,6 +1384,65 @@
         renderHistorial();
         renderPanel();
       });
+    });
+  }
+
+  function abrirDia(grupo){
+    const fecha = grupo.dataset.fecha;
+    const cuerpo = grupo.querySelector(".dia-cuerpo");
+    if(!cuerpo.dataset.pintado){
+      const regs = state.records.filter(r=>r.fecha === fecha);
+      cuerpo.innerHTML = regs.map(tarjetaRegistro).join("");
+      cuerpo.dataset.pintado = "1";
+      engancharBorrado(cuerpo);
+    }
+    grupo.classList.add("abierto");
+    diasAbiertos.add(fecha);
+  }
+
+  function cerrarDia(grupo){
+    grupo.classList.remove("abierto");
+    diasAbiertos.delete(grupo.dataset.fecha);
+  }
+
+  function renderHistorial(){
+    const el = $("historial-list");
+    if(state.records.length === 0){
+      el.innerHTML = `<div class="empty-state">
+        <div class="stamp-outline">◎</div>
+        <p>No hay registros todavía.</p>
+      </div>`;
+      return;
+    }
+
+    const porDia = {};
+    state.records.forEach(r=>{
+      const f = r.fecha || "sin fecha";
+      (porDia[f] = porDia[f] || []).push(r);
+    });
+    const dias = Object.keys(porDia).sort().reverse();
+
+    // El día más reciente se abre solo: casi siempre es lo que se viene a ver.
+    if(diasAbiertos.size === 0 && dias.length) diasAbiertos.add(dias[0]);
+
+    el.innerHTML = dias.map(f=>{
+      const regs = porDia[f];
+      const turistas = regs.reduce((acc,r)=>acc+r.total, 0);
+      return `<div class="dia-grupo" data-fecha="${escapeAttr(f)}">
+        <button type="button" class="dia-cabecera">
+          <span class="dia-flecha" aria-hidden="true">▸</span>
+          <span class="dia-fecha">${escapeHtml(nombreDelDia(f))}</span>
+          <span class="dia-conteo">${regs.length} ${regs.length===1?'registro':'registros'} · ${turistas.toLocaleString('es-CL')} ${turistas===1?'turista':'turistas'}</span>
+        </button>
+        <div class="dia-cuerpo"></div>
+      </div>`;
+    }).join("");
+
+    el.querySelectorAll(".dia-grupo").forEach(grupo=>{
+      grupo.querySelector(".dia-cabecera").addEventListener("click", ()=>{
+        grupo.classList.contains("abierto") ? cerrarDia(grupo) : abrirDia(grupo);
+      });
+      if(diasAbiertos.has(grupo.dataset.fecha)) abrirDia(grupo);
     });
   }
 
