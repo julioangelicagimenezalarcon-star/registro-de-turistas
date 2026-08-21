@@ -314,7 +314,21 @@ app.post("/api/import", async (req, res) => {
   }
 });
 
-app.use(express.static(__dirname));
+// Solo se publica public/. Antes se servía __dirname entero, así que quedaban
+// accesibles desde internet server.js, package.json, README.md, tools/ y —lo
+// peor— docs/, que incluye la lista de vulnerabilidades abiertas de esta misma
+// app y el SQL de limpieza de la base. (CN-005 de la auditoría del 2026-08-21.)
+const PUBLICO = path.join(__dirname, "public");
+
+// El set de datos simulados solo se entrega en desarrollo: son datos ficticios
+// y no tienen por qué poder confundirse con registros reales en internet.
+app.get("/seed-data.json", (req, res, next) => {
+  const h = req.hostname;
+  if (h === "localhost" || h === "127.0.0.1") return next();
+  res.status(404).end();
+});
+
+app.use(express.static(PUBLICO));
 
 const PORT = process.env.PORT || 8090;
 initDb()

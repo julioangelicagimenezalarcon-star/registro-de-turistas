@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Genera `seed-data.json`: una temporada alta SIMULADA de Cobquecura.
+Genera `public/seed-data.json`: una temporada alta SIMULADA de Cobquecura.
 
 Por qué existe: la app se estrena en terreno en la temporada dic-2026 → mar-2027
 y hasta entonces la base real está casi vacía (1 registro). Sin volumen, el
@@ -286,7 +286,7 @@ def main():
 
     registros.sort(key=lambda r: r["fecha"], reverse=True)
     salida = {"records": registros, "atractivosCustom": [], "serviciosCustom": []}
-    destino = os.path.join(RAIZ, "seed-data.json")
+    destino = os.path.join(RAIZ, "public", "seed-data.json")
     with open(destino, "w", encoding="utf-8") as f:
         # Compacto a propósito: el archivo lo descarga el navegador y nadie lo
         # lee a mano — se regenera con este script.

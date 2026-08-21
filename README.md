@@ -14,13 +14,25 @@ código: explica qué se hizo, por qué, y qué falta.
 
 ```
 tourist-registry-app/
-├── index.html          Estructura HTML + <head> (fuentes, Chart.js, SheetJS)
-├── styles.css           Todos los estilos (tema "pasaporte/sello de viajero")
-├── app.js               Toda la lógica (formulario, storage, gráficos, exportar)
-├── assets/
-│   └── logo-cobquecura.jpg   Escudo de la Municipalidad (favicon, apple-touch-icon, header)
+├── public/              LO ÚNICO que el servidor publica en internet
+│   ├── index.html         Estructura HTML + <head>
+│   ├── styles.css         Todos los estilos (tema "pasaporte/sello de viajero")
+│   ├── app.js             Toda la lógica (formulario, storage, gráficos, exportar)
+│   ├── seed-data.json     Temporada simulada (solo se sirve en localhost)
+│   ├── assets/            Escudo de la Municipalidad e iconos de la PWA
+│   └── vendor/            Chart.js y SheetJS alojados localmente
+├── server.js            Backend Express + Postgres (NO se publica)
+├── tools/               Generador del seed (NO se publica)
+├── docs/                Estado, pendientes y auditorías (NO se publica)
 └── README.md            Este archivo
 ```
+
+**La separación `public/` no es cosmética.** Hasta el 2026-08-21 el servidor
+publicaba el directorio completo: `server.js`, `package.json`, `tools/` y
+`docs/` —que incluye la lista de vulnerabilidades abiertas de esta misma app y
+el SQL de limpieza de la base— eran descargables por cualquiera. Si agregas un
+archivo nuevo, la pregunta es siempre: *¿esto tiene que poder bajarlo un
+desconocido?* Si la respuesta es no, va fuera de `public/`.
 
 Antes de este traspaso, todo vivía en un único archivo HTML autocontenido
 (pensado para el artefacto de Claude.ai). Se separó en `index.html` /
@@ -125,10 +137,12 @@ elegido, sin tocar el resto de la lógica de la app (que solo llama a
 Es HTML/CSS/JS puro, sin build step. Basta con servir la carpeta:
 
 ```bash
-cd tourist-registry-app
+cd tourist-registry-app/public
 python3 -m http.server 8080
 # abrir http://localhost:8080 en el navegador
 ```
+
+(Ojo: hay que pararse dentro de `public/`, no en la raíz del proyecto.)
 
 (No abras `index.html` con doble clic / `file://` directo — algunos
 navegadores bloquean `fetch`/scripts locales por CORS. Sirve la carpeta con
