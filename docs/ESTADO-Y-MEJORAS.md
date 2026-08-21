@@ -59,11 +59,19 @@ seguridad). Verificado contra producción: `records`, `custom`, `import` y
 ⚠️ **`APP_CLAVE` es obligatoria en Railway: sin ella el servidor no arranca.**
 Al desplegar, configurar la variable ANTES de subir el código.
 
+**CN-005 también quedó cerrado** (tercer despliegue del día): el servidor solo
+publica `public/`. Antes del cambio se verificó contra producción que
+`/server.js`, `/package.json`, `/README.md`, `/tools/` y `/docs/` devolvían 200
+— incluido este mismo archivo, que lista las vulnerabilidades abiertas de la
+app, y el SQL de limpieza de la base.
+
+**Regla para archivos nuevos:** si no tiene que poder bajarlo un desconocido, va
+fuera de `public/`.
+
 Siguen abiertos de la auditoría (informe en el Escritorio): **CN-004** (SheetJS
-0.18.5 con CVE conocidos, vendorizado, npm audit no lo ve), **CN-005** (el
-servidor publica su propio código fuente vía `express.static(__dirname)`),
-**CN-007** (`rejectUnauthorized:false`), **CN-008** (sin rate limit fuera del
-login), **CN-009** (sin validación de entrada en el servidor) y **CN-010**
+0.18.5 con CVE conocidos, vendorizado, npm audit no lo ve), **CN-007**
+(`rejectUnauthorized:false` contra Postgres), **CN-008** (sin rate limit fuera
+del login), **CN-009** (sin validación de entrada en el servidor) y **CN-010**
 (borrado sin confirmación ni trazabilidad).
 
 **Pendiente aparte:** el `git push` a GitHub falló — el llavero de macOS tiene
