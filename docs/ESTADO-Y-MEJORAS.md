@@ -68,11 +68,20 @@ app, y el SQL de limpieza de la base.
 **Regla para archivos nuevos:** si no tiene que poder bajarlo un desconocido, va
 fuera de `public/`.
 
+**CN-010 cerrado** (cuarto despliegue del día): el borrado es lógico. Se
+confirma mostrando de qué registro se trata, la fila queda en la base marcada
+con quién y cuándo, y se recupera desde "Ver eliminados" en el Historial. La
+migración fue aditiva (`ADD COLUMN IF NOT EXISTS`), sin tocar las filas
+existentes.
+
 Siguen abiertos de la auditoría (informe en el Escritorio): **CN-004** (SheetJS
 0.18.5 con CVE conocidos, vendorizado, npm audit no lo ve), **CN-007**
 (`rejectUnauthorized:false` contra Postgres), **CN-008** (sin rate limit fuera
-del login), **CN-009** (sin validación de entrada en el servidor) y **CN-010**
-(borrado sin confirmación ni trazabilidad).
+del login) y **CN-009** (sin validación de entrada en el servidor).
+
+**Pendiente de producto, no de seguridad:** `eliminado_por` lo declara el
+cliente, porque la clave de acceso es compartida y el servidor no puede saber
+quién borra de verdad. Si eso llega a importar, hace falta un PIN por informador.
 
 **Pendiente aparte:** el `git push` a GitHub falló — el llavero de macOS tiene
 una credencial vencida. El commit está solo en local. (Se quitó del
