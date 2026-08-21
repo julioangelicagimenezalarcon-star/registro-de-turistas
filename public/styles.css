@@ -43,10 +43,10 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background: var(--ink);
+    background: var(--cobq-verde);
     background-image:
-      radial-gradient(circle at 15% 18%, rgba(125,192,64,0.13), transparent 45%),
-      radial-gradient(circle at 85% 82%, rgba(47,179,168,0.10), transparent 45%);
+      radial-gradient(circle at 15% 18%, rgba(220,239,197,0.45), transparent 45%),
+      radial-gradient(circle at 85% 82%, rgba(90,154,40,0.35), transparent 48%);
     color: var(--charcoal);
     font-family: 'IBM Plex Sans', sans-serif;
     min-height: 100vh;
@@ -116,23 +116,23 @@
      clara y por eso va en negro. */
   .masthead{
     display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:16px;
-    padding: 20px 22px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+    padding: 26px 22px 22px;
     margin-bottom: 24px;
-    flex-wrap: nowrap;
     position: relative;
     border-radius: 14px;
     overflow: hidden;
-    background: linear-gradient(90deg,
-      #DCEFC5 0%,
-      #B9DE8E 18%,
-      #7DC040 38%,
-      #5A9A28 55%,
-      #3D7317 67%,
-      #264E0E 77%,
-      #14150E 88%);
+    background: linear-gradient(180deg,
+      #14150E 0%,
+      #264E0E 44%,
+      #3D7317 52%,
+      #7DC040 60%,
+      #B9DE8E 72%,
+      #DCEFC5 86%,
+      #DCEFC5 100%);
   }
   .masthead::after{
     content:"";
@@ -141,7 +141,7 @@
     height:4px;
     background: var(--cobq-verde);
   }
-  .masthead .title-block{ min-width:0; max-width: 52%; }
+  .masthead .title-block{ min-width:0; max-width: 100%; }
   .masthead .title-block h1{
     font-family:'Fraunces', serif;
     font-optical-sizing:auto;
@@ -165,19 +165,8 @@
        coincidir con los elementos: el logo caía sobre el verde claro y se
        perdía (1,75 de contraste). Aquí las paradas se corren para que el negro
        vuelva antes de que empiece el logo. */
-    .masthead{
-      padding: 16px 16px;
-      gap: 10px;
-      background: linear-gradient(90deg,
-        #DCEFC5 0%,
-        #B9DE8E 20%,
-        #7DC040 40%,
-        #5A9A28 53%,
-        #3D7317 61%,
-        #264E0E 68%,
-        #14150E 76%);
-    }
-    .masthead .title-block{ max-width: 48%; }
+    .masthead{ padding: 22px 16px 18px; gap: 12px; }
+    .masthead .title-block{ max-width: 100%; }
     .masthead .title-block h1{ font-size: 1.72rem; }
     .masthead .title-block p{ font-size: 0.76rem; }
   }
@@ -187,12 +176,12 @@
     align-items:center;
   }
   .compass img{
-    height: 68px;
+    height: 82px;
     width: auto;
     display:block;
   }
   @media (max-width: 560px){
-    .compass img{ height: 52px; }
+    .compass img{ height: 66px; }
   }
   .masthead-right{ display:flex; align-items:center; gap:14px; }
 
@@ -201,7 +190,7 @@
     display:flex;
     gap:6px;
     margin-bottom: 22px;
-    background: rgba(246,241,228,0.08);
+    background: rgba(20,21,14,0.14);
     padding: 5px;
     border-radius: 12px;
     width: fit-content;
@@ -209,7 +198,7 @@
   .tab-btn{
     border:none;
     background:transparent;
-    color: rgba(246,241,228,0.7);
+    color: rgba(20,21,14,0.72);
     font-family:'IBM Plex Sans', sans-serif;
     font-weight:600;
     font-size:0.86rem;
@@ -218,7 +207,7 @@
     cursor:pointer;
     transition: all .15s ease;
   }
-  .tab-btn:hover{ color: var(--paper); }
+  .tab-btn:hover{ color: var(--ink); }
   .tab-btn.active{
     background: var(--gold);
     color: var(--ink);
@@ -631,7 +620,7 @@
 
   .shared-note{
     font-size: 0.76rem;
-    color: rgba(246,241,228,0.55);
+    color: rgba(20,21,14,0.70);
     margin-top: 8px;
   }
   .shared-note.mismatch{

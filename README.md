@@ -263,28 +263,32 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
   titular de la tarjeta destacada se cortaba a media palabra en pantallas
   angostas.
 
-- **(2026-08-21) Encabezado en degradado**, pedido de Julio: un solo recorrido
-  de izquierda a derecha, del verde muy claro `#DCEFC5` al casi negro `#14150E`,
-  con el logo blanco sobre el extremo oscuro. Logo y título más grandes.
+- **(2026-08-21) Encabezado apilado y fondo lima**, pedido de Julio: el logo
+  arriba, "Registro de Turistas" grande debajo, y más abajo la Municipalidad; y
+  el **fondo general de la app en verde lima `#7DC040`**.
 
-  **El texto va en negro, no en mostaza.** Se probó el mostaza `#F2B33D` (el del
-  "48,2%") y no se lee sobre ningún verde de la escala: 1,52 sobre `#DCEFC5`,
-  1,19 sobre el oficial, 1,85 sobre `#5A9A28`. Solo aguanta desde `#264E0E`
-  hacia abajo. Mostazas más oscuros (`#8A6A18`, `#7E6015`, `#6F5412`) tampoco
-  pasan el recorrido completo: el fondo va de muy claro a verde medio y un
-  amarillo queda siempre en luminancia intermedia. El mostaza sí quedó en la
-  **pestaña marcada**, que va sobre la arena negra (9,88).
+  **El degradado del encabezado pasó de horizontal a VERTICAL** por una razón
+  estructural: apilados, el logo y el texto cruzan todo el ancho, así que un
+  degradado horizontal les daría a los dos la misma mezcla de fondos claros y
+  oscuros. En vertical cada uno cae en su franja — oscuro arriba para el logo
+  blanco, aclarando hacia el verde claro donde va el texto negro.
 
-  **Cuidado al tocar las paradas:** son porcentajes, y los elementos ocupan
-  porcentajes distintos según el ancho. Con las paradas del escritorio, en móvil
-  el subtítulo caía a 3,98 (bajo el mínimo de 4,5 para texto pequeño) porque el
-  tramo claro terminaba antes que el texto. Por eso el `@media (max-width:620px)`
-  lleva su propio degradado, con el tramo claro alargado. Si se cambian, hay que
-  volver a medir en ambos anchos — y medirlo de verdad: pintando el degradado en
-  un canvas y leyendo el píxel real bajo cada elemento, punto por punto. A ojo
-  este error no se ve.
+  **Las paradas del degradado dependen de la ALTURA del encabezado**, que cambia
+  con el ancho de pantalla (211 px en escritorio, 169 px en móvil). La
+  transición de oscuro a claro tiene que caer en el hueco entre el logo y el
+  título: si cae encima de uno de los dos, ese elemento pierde contraste. Costó
+  dos intentos — primero el logo quedó en 3,95, después el título en 3,62 — y se
+  resolvió comprimiendo la transición entre el 52% y el 60% de la altura, que es
+  justo el espacio vacío entre ambos.
 
-  Medido — escritorio: texto 5,74 / logo 8,0. Móvil: texto 6,32 / logo 7,78.
+  **Al pasar el fondo a lima hubo que dar vuelta todo lo que se escribe
+  directamente sobre él**: las pestañas inactivas y la nota de estado estaban en
+  crema translúcido para el fondo oscuro y sobre el lima quedaban en ~1,7. Ahora
+  van en tinta translúcida. Ojo: los cremas que quedan en el CSS son de la
+  tarjeta destacada, que tiene su propio fondo oscuro — esos son correctos.
+
+  Medido — escritorio: logo 5,61 / título 7,28 / subtítulo 13,98. Móvil: 4,83 /
+  7,77 / 13,80. Resto de la app: 0 incumplimientos AA en las tres pestañas.
 
 - **(2026-08-21) Borrar deja de ser destructivo (CN-010)**. Antes, un toque en
   "Eliminar" hacía un `DELETE` físico e inmediato: el registro desaparecía para
