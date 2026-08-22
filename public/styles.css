@@ -205,7 +205,9 @@
        el verde de la app— y lo que se agrega es el material y la profundidad.
        Al quedar pegada arriba se cambia de sección sin volver a subir. */
     position: sticky;
-    top: 8px;
+    /* Baja lo suficiente para no pegarse al borde ni quedar bajo la barra de
+       estado del teléfono. El env() suma el alto del notch cuando existe. */
+    top: calc(env(safe-area-inset-top, 0px) + 18px);
     z-index: 30;
     display:flex;
     gap:6px;
