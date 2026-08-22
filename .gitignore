@@ -1,2 +1,12 @@
 node_modules/
 tools/seed-data.ANTERIOR.json
+
+# Nunca versionar variables de entorno: acá viven DATABASE_URL y APP_CLAVE.
+.env
+.env.*
+!.env.example
+
+# Claves y certificados
+*.pem
+*.key
+*.p12
