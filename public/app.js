@@ -1312,11 +1312,14 @@
   });
 
   // ---------- Historial ----------
-  // ---------- Historial agrupado por día ----------
-  // Con una temporada completa son más de mil registros: la lista corrida era
-  // imposible de recorrer y además dibujaba las mil tarjetas de una vez. Ahora
-  // se listan los días y cada uno pinta sus registros SOLO al abrirse.
+  // ---------- Historial agrupado por mes y día ----------
+  // Con una temporada completa son más de mil registros repartidos en 92 días:
+  // ni la lista corrida ni la lista de días eran recorribles. Se agrupa en dos
+  // niveles —mes y día— y CADA NIVEL pinta su contenido solo al abrirse, así el
+  // DOM nunca carga con lo que nadie está mirando.
+  const mesesAbiertos = new Set();
   const diasAbiertos = new Set();
+  let historialPorMes = {};
 
   function tarjetaRegistro(r){
     return `
@@ -1387,11 +1390,23 @@
     });
   }
 
+  function nombreDelMes(ym){
+    const [y,m] = ym.split("-").map(Number);
+    if(!y || !m) return ym;
+    const t = new Date(y, m-1, 1).toLocaleDateString('es-ES', {month:'long', year:'numeric'});
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function resumen(regs){
+    const turistas = regs.reduce((acc,r)=>acc+r.total, 0);
+    return `${regs.length} ${regs.length===1?'registro':'registros'} · ${turistas.toLocaleString('es-CL')} ${turistas===1?'turista':'turistas'}`;
+  }
+
   function abrirDia(grupo){
     const fecha = grupo.dataset.fecha;
     const cuerpo = grupo.querySelector(".dia-cuerpo");
     if(!cuerpo.dataset.pintado){
-      const regs = state.records.filter(r=>r.fecha === fecha);
+      const regs = (historialPorMes[fecha.slice(0,7)] || {})[fecha] || [];
       cuerpo.innerHTML = regs.map(tarjetaRegistro).join("");
       cuerpo.dataset.pintado = "1";
       engancharBorrado(cuerpo);
@@ -1405,6 +1420,37 @@
     diasAbiertos.delete(grupo.dataset.fecha);
   }
 
+  function abrirMes(grupo){
+    const ym = grupo.dataset.mes;
+    const cuerpo = grupo.querySelector(".mes-cuerpo");
+    if(!cuerpo.dataset.pintado){
+      const dias = Object.keys(historialPorMes[ym] || {}).sort().reverse();
+      cuerpo.innerHTML = dias.map(f=>`
+        <div class="dia-grupo" data-fecha="${escapeAttr(f)}">
+          <button type="button" class="dia-cabecera">
+            <span class="dia-flecha" aria-hidden="true">▸</span>
+            <span class="dia-fecha">${escapeHtml(nombreDelDia(f))}</span>
+            <span class="dia-conteo">${resumen(historialPorMes[ym][f])}</span>
+          </button>
+          <div class="dia-cuerpo"></div>
+        </div>`).join("");
+      cuerpo.dataset.pintado = "1";
+      cuerpo.querySelectorAll(".dia-grupo").forEach(g=>{
+        g.querySelector(".dia-cabecera").addEventListener("click", ()=>{
+          g.classList.contains("abierto") ? cerrarDia(g) : abrirDia(g);
+        });
+        if(diasAbiertos.has(g.dataset.fecha)) abrirDia(g);
+      });
+    }
+    grupo.classList.add("abierto");
+    mesesAbiertos.add(ym);
+  }
+
+  function cerrarMes(grupo){
+    grupo.classList.remove("abierto");
+    mesesAbiertos.delete(grupo.dataset.mes);
+  }
+
   function renderHistorial(){
     const el = $("historial-list");
     if(state.records.length === 0){
@@ -1415,34 +1461,40 @@
       return;
     }
 
-    const porDia = {};
+    historialPorMes = {};
     state.records.forEach(r=>{
       const f = r.fecha || "sin fecha";
-      (porDia[f] = porDia[f] || []).push(r);
+      const ym = f.slice(0,7);
+      historialPorMes[ym] = historialPorMes[ym] || {};
+      (historialPorMes[ym][f] = historialPorMes[ym][f] || []).push(r);
     });
-    const dias = Object.keys(porDia).sort().reverse();
+    const meses = Object.keys(historialPorMes).sort().reverse();
 
-    // El día más reciente se abre solo: casi siempre es lo que se viene a ver.
-    if(diasAbiertos.size === 0 && dias.length) diasAbiertos.add(dias[0]);
+    // El mes y el día más recientes se abren solos: es lo que se viene a ver.
+    if(mesesAbiertos.size === 0 && meses.length){
+      mesesAbiertos.add(meses[0]);
+      const primerDia = Object.keys(historialPorMes[meses[0]]).sort().reverse()[0];
+      if(primerDia) diasAbiertos.add(primerDia);
+    }
 
-    el.innerHTML = dias.map(f=>{
-      const regs = porDia[f];
-      const turistas = regs.reduce((acc,r)=>acc+r.total, 0);
-      return `<div class="dia-grupo" data-fecha="${escapeAttr(f)}">
-        <button type="button" class="dia-cabecera">
-          <span class="dia-flecha" aria-hidden="true">▸</span>
-          <span class="dia-fecha">${escapeHtml(nombreDelDia(f))}</span>
-          <span class="dia-conteo">${regs.length} ${regs.length===1?'registro':'registros'} · ${turistas.toLocaleString('es-CL')} ${turistas===1?'turista':'turistas'}</span>
+    el.innerHTML = meses.map(ym=>{
+      const regs = Object.values(historialPorMes[ym]).flat();
+      const nDias = Object.keys(historialPorMes[ym]).length;
+      return `<div class="mes-grupo" data-mes="${escapeAttr(ym)}">
+        <button type="button" class="mes-cabecera">
+          <span class="mes-flecha" aria-hidden="true">▸</span>
+          <span class="mes-nombre">${escapeHtml(nombreDelMes(ym))}</span>
+          <span class="mes-conteo">${nDias} ${nDias===1?'día':'días'} · ${resumen(regs)}</span>
         </button>
-        <div class="dia-cuerpo"></div>
+        <div class="mes-cuerpo"></div>
       </div>`;
     }).join("");
 
-    el.querySelectorAll(".dia-grupo").forEach(grupo=>{
-      grupo.querySelector(".dia-cabecera").addEventListener("click", ()=>{
-        grupo.classList.contains("abierto") ? cerrarDia(grupo) : abrirDia(grupo);
+    el.querySelectorAll(".mes-grupo").forEach(grupo=>{
+      grupo.querySelector(".mes-cabecera").addEventListener("click", ()=>{
+        grupo.classList.contains("abierto") ? cerrarMes(grupo) : abrirMes(grupo);
       });
-      if(diasAbiertos.has(grupo.dataset.fecha)) abrirDia(grupo);
+      if(mesesAbiertos.has(grupo.dataset.mes)) abrirMes(grupo);
     });
   }
 

@@ -207,18 +207,22 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
-- **(2026-08-21) El Historial se agrupa por día**, pedido de Julio: la lista
-  corrida era imposible de recorrer con una temporada completa encima.
+- **(2026-08-21) El Historial se agrupa por mes y día**, pedido de Julio: la
+  lista corrida era imposible de recorrer con una temporada completa encima, y
+  la lista de 92 días tampoco.
 
-  Ahora se listan los días —fecha, cantidad de registros y total de turistas— y
-  cada uno se despliega al pincharlo. El más reciente se abre solo, que casi
-  siempre es lo que se viene a ver.
+  Son dos niveles: **mes** (días, registros y turistas del mes) → **día** (sus
+  registros) → las tarjetas. El mes y el día más recientes se abren solos, que
+  es lo que se viene a ver.
 
-  **Cada día pinta sus registros SOLO al abrirse** (`abrirDia()` marca el cuerpo
-  con `dataset.pintado`). No es un detalle de rendimiento menor: antes se
-  dibujaban las 1.246 tarjetas de una vez en cada render; ahora el DOM arranca
-  con 92 cabeceras y 4 tarjetas. Esto importa en los teléfonos con los que se
-  usa la app en terreno.
+  **Cada nivel pinta su contenido SOLO al abrirse** (`abrirMes()` y `abrirDia()`
+  marcan el cuerpo con `dataset.pintado`). No es un detalle de rendimiento
+  menor: antes se dibujaban las 1.246 tarjetas de una vez en cada render; ahora
+  el DOM arranca con 5 meses, 15 días y 4 tarjetas. Esto importa en los
+  teléfonos con los que se usa la app en terreno.
+
+  El estado vive en dos `Set` (`mesesAbiertos`, `diasAbiertos`), así que al
+  cerrar un mes se recuerda qué día estaba abierto dentro.
 
   Los listeners de "Eliminar" ya no se enganchan con un
   `document.querySelectorAll` global: `engancharBorrado(contenedor)` los asigna

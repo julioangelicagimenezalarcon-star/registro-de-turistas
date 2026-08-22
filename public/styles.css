@@ -743,6 +743,59 @@
     margin: 14px 0 0;
   }
 
+  /* Historial: nivel mes */
+  .mes-grupo{
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--cobq-verde-700);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: var(--paper-2);
+  }
+  .mes-cabecera{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 15px 16px;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'IBM Plex Sans', sans-serif;
+    transition: background .14s ease;
+  }
+  .mes-cabecera:hover{ background: rgba(61,115,23,0.07); }
+  .mes-flecha{
+    color: var(--cobq-verde-700);
+    font-size: 1rem;
+    flex: none;
+    transition: transform .16s ease;
+  }
+  .mes-grupo.abierto .mes-flecha{ transform: rotate(90deg); }
+  .mes-nombre{
+    font-family:'Fraunces', serif;
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: var(--ink);
+    flex: 1;
+    min-width: 0;
+  }
+  .mes-conteo{
+    font-size: 0.74rem;
+    color: var(--cobq-verde-700);
+    font-weight: 600;
+    flex: none;
+    white-space: nowrap;
+  }
+  .mes-cuerpo{ display: none; padding: 0 10px 10px; }
+  .mes-grupo.abierto .mes-cuerpo{ display: block; }
+  @media (max-width: 560px){
+    .mes-cabecera{ flex-wrap: wrap; gap: 4px 10px; }
+    .mes-nombre{ flex: 1 1 auto; }
+    .mes-conteo{ flex: 1 1 100%; margin-left: 26px; }
+  }
+
   /* Historial agrupado por día */
   .dia-grupo{
     border: 1px solid var(--line);
