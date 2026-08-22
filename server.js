@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const { Pool } = require("pg");
 const crypto = require("crypto");
+const { generarInforme } = require("./informe");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -268,6 +269,26 @@ app.delete("/api/records/:id", async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "db_error" });
+  }
+});
+
+// Informe ejecutivo en Excel. Se arma en el servidor porque la versión libre de
+// SheetJS (la que usaba el navegador) no escribe estilos de celda, y por eso el
+// archivo salía sin colores ni bordes.
+app.get("/api/export/excel", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM records WHERE eliminado_en IS NULL ORDER BY fecha DESC, id DESC LIMIT 20000");
+    const registros = rows.map(rowToRecord);
+    if (!registros.length) return res.status(404).json({ error: "sin_registros" });
+    const buffer = await generarInforme(registros);
+    const hoy = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="informe-registro-turistas-${hoy}.xlsx"`);
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    console.error("No se pudo generar el informe", e);
+    res.status(500).json({ error: "informe_error" });
   }
 });
 

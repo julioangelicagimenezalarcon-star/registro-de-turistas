@@ -207,6 +207,40 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
 
 ## 8. Historial de decisiones relevantes (contexto de por qué las cosas son como son)
 
+- **(2026-08-21) El export a Excel pasa a ser un informe ejecutivo**
+  (`informe.js`), pedido de Julio: el archivo anterior "se veía poco
+  profesional".
+
+  **La causa era la herramienta, no el diseño:** el export se armaba en el
+  navegador con SheetJS, y **la versión libre de SheetJS no escribe estilos de
+  celda** — ni colores, ni bordes, ni fuentes. Por eso salía plano. Se cambió a
+  **ExcelJS**, que sí los escribe pero es una librería de Node, así que el
+  informe se genera en el servidor (`GET /api/export/excel`, detrás de la
+  sesión) y el navegador solo lo descarga.
+
+  Efecto colateral bueno: al quedar sin uso, se eliminó `vendor/xlsx.full.min.js`
+  — que era **CN-004** de la auditoría, con CVE-2023-30533 y CVE-2024-22363.
+
+  **Lo que ExcelJS NO puede hacer: gráficos nativos ni tablas dinámicas.** El
+  tablero se construye con lo que sí es nativo y se recalcula solo dentro de
+  Excel: un selector de mes con validación de datos, KPIs con fórmulas
+  `SUMIF`/`SUMIFS` que dependen de esa celda, y barras de datos por formato
+  condicional. Al cambiar el mes, todo el tablero responde.
+
+  Cuatro hojas: **Resumen ejecutivo** (portada, KPIs y el análisis narrativo en
+  seis secciones más la conclusión, todo redactado automáticamente a partir de
+  los datos), **Dashboard**, **Análisis** (rankings por dimensión con barras) y
+  **Datos** (tabla completa con autofiltro y encabezado congelado).
+
+  **Cuidado con los códigos de formato numérico:** en Excel el separador decimal
+  dentro del código se escribe SIEMPRE con punto — la coma significa "escalar
+  por miles". Con `"0,0"` el grupo promedio 3,8 se mostraba como **"04"**. Es
+  `"0.0"`, y Excel muestra la coma según la configuración regional del equipo.
+  Este error no se detecta leyendo el código: hay que abrir el archivo y mirarlo.
+
+  Se agregó `overrides.uuid` en `package.json` porque ExcelJS arrastra un uuid
+  con una vulnerabilidad moderada que `npm audit fix` no resolvía solo.
+
 - **(2026-08-21) El Historial se agrupa por mes y día**, pedido de Julio: la
   lista corrida era imposible de recorrer con una temporada completa encima, y
   la lista de 92 días tampoco.

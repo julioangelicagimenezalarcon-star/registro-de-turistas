@@ -1519,98 +1519,44 @@
   });
 
   // ---------- Excel database export (Registros + Análisis con fórmulas) ----------
-  $("export-xlsx-btn").addEventListener("click", ()=>{
+  $("export-xlsx-btn").addEventListener("click", async ()=>{
     if(state.records.length === 0){ alert("Aún no hay registros para exportar."); return; }
-    const DATA_END = 1001; // capacidad: hasta 1000 filas de datos
+    const btn = $("export-xlsx-btn");
+    const textoOriginal = btn.textContent;
 
-    // ---- Hoja Registros ----
-    const headers = ["fecha","procedencia","informador","femenino","masculino","total","edad_menor18","edad_18_29","edad_30_40","edad_41_50","edad_mayor50","motivo","atractivos","servicios","pais","region","comuna"];
-    const aoa = [headers];
-    state.records.forEach(r=>{
-      aoa.push([
-        r.fecha, r.procedencia, r.informador||"",
-        r.femenino, r.masculino, r.total,
-        r.edad_menor18, r.edad_18_29, r.edad_30_40, r.edad_41_50, r.edad_mayor50,
-        r.motivo, (r.atractivos||[]).join(" | "), (r.servicios||[]).join(" | "),
-        r.pais||"", r.region||"", r.comuna||""
-      ]);
-    });
-    const wsReg = XLSX.utils.aoa_to_sheet(aoa);
-    wsReg["!cols"] = [{wch:12},{wch:16},{wch:16},{wch:9},{wch:10},{wch:8},{wch:11},{wch:9},{wch:9},{wch:9},{wch:11},{wch:24},{wch:28},{wch:28},{wch:14},{wch:20},{wch:16}];
-
-    // ---- Hoja Análisis ----
-    const wsA = {};
-    const setC = (addr, val, formula, fmt)=>{
-      const cell = {};
-      if(formula){ cell.t = "n"; cell.f = formula; }
-      else if(typeof val === "number"){ cell.t="n"; cell.v = val; }
-      else { cell.t="s"; cell.v = String(val); }
-      if(fmt) cell.z = fmt;
-      wsA[addr] = cell;
-    };
-    const PCT = "0.0%";
-    let row = 1;
-    setC(`A${row}`, "Registro de Turistas — Análisis"); row++;
-    setC(`A${row}`, "Se recalcula al pegar más filas en la hoja 'Registros' (fórmulas activas)."); row+=2;
-
-    setC(`A${row}`, "Resumen general"); row++;
-    setC(`A${row}`, "Total de registros"); setC(`B${row}`, null, `COUNTA(Registros!A2:A${DATA_END})`); const REG_C = `B${row}`; row++;
-    setC(`A${row}`, "Total de turistas"); setC(`B${row}`, null, `SUM(Registros!F2:F${DATA_END})`); const TOT_C = `B${row}`; row++;
-    setC(`A${row}`, "% Femenino"); setC(`B${row}`, null, `IFERROR(SUM(Registros!D2:D${DATA_END})/${TOT_C},0)`, PCT); row++;
-    setC(`A${row}`, "% Masculino"); setC(`B${row}`, null, `IFERROR(SUM(Registros!E2:E${DATA_END})/${TOT_C},0)`, PCT); row+=2;
-
-    setC(`A${row}`, "Género"); setC(`B${row}`, "%"); row++;
-    setC(`A${row}`, "Femenino"); setC(`B${row}`, null, `IFERROR(SUM(Registros!D2:D${DATA_END})/${TOT_C},0)`, PCT); row++;
-    setC(`A${row}`, "Masculino"); setC(`B${row}`, null, `IFERROR(SUM(Registros!E2:E${DATA_END})/${TOT_C},0)`, PCT); row+=2;
-
-    setC(`A${row}`, "Rango de edad (% del total de turistas)"); row++;
-    setC(`A${row}`, "Rango"); setC(`B${row}`, "%"); row++;
-    const edadDefs = [["Menor de 18","G"],["18 – 29","H"],["30 – 40","I"],["41 – 50","J"],["Mayor de 50","K"]];
-    edadDefs.forEach(([lbl,col])=>{
-      setC(`A${row}`, lbl); setC(`B${row}`, null, `IFERROR(SUM(Registros!${col}2:${col}${DATA_END})/${TOT_C},0)`, PCT); row++;
-    });
-    row++;
-
-    setC(`A${row}`, "Motivo del viaje (% de los registros)"); row++;
-    setC(`A${row}`, "Motivo"); setC(`B${row}`, "%"); row++;
-    MOTIVOS.forEach(m=>{
-      setC(`A${row}`, m); setC(`B${row}`, null, `IFERROR(COUNTIF(Registros!L2:L${DATA_END},A${row})/${REG_C},0)`, PCT); row++;
-    });
-    row++;
-
-    // Procedencia: top orígenes reales encontrados en los datos
-    const procCount = {};
-    state.records.forEach(r=>{ if(r.procedencia) procCount[r.procedencia] = (procCount[r.procedencia]||0)+1; });
-    const topProc = Object.entries(procCount).sort((a,b)=>b[1]-a[1]).slice(0,10).map(e=>e[0]);
-    setC(`A${row}`, "Procedencia — principales orígenes (% de los registros)"); row++;
-    setC(`A${row}`, "Origen"); setC(`B${row}`, "%"); row++;
-    topProc.forEach(p=>{
-      setC(`A${row}`, p); setC(`B${row}`, null, `IFERROR(COUNTIF(Registros!B2:B${DATA_END},A${row})/${REG_C},0)`, PCT); row++;
-    });
-    row++;
-
-    const atractivosAll = [...DEFAULT_ATRACTIVOS, ...state.atractivosCustom];
-    setC(`A${row}`, "Atractivos turísticos más consultados (% de los registros)"); row++;
-    setC(`A${row}`, "Atractivo"); setC(`B${row}`, "%"); row++;
-    atractivosAll.forEach(a=>{
-      setC(`A${row}`, a); setC(`B${row}`, null, `IFERROR(SUMPRODUCT(--ISNUMBER(SEARCH(A${row},Registros!M2:M${DATA_END})))/${REG_C},0)`, PCT); row++;
-    });
-    row++;
-
-    const serviciosAll = [...DEFAULT_SERVICIOS, ...state.serviciosCustom];
-    setC(`A${row}`, "Servicios turísticos más consultados (% de los registros)"); row++;
-    setC(`A${row}`, "Servicio"); setC(`B${row}`, "%"); row++;
-    serviciosAll.forEach(s=>{
-      setC(`A${row}`, s); setC(`B${row}`, null, `IFERROR(SUMPRODUCT(--ISNUMBER(SEARCH(A${row},Registros!N2:N${DATA_END})))/${REG_C},0)`, PCT); row++;
-    });
-
-    wsA["!ref"] = `A1:B${row}`;
-    wsA["!cols"] = [{wch:34},{wch:10}];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsReg, "Registros");
-    XLSX.utils.book_append_sheet(wb, wsA, "Análisis");
-    XLSX.writeFile(wb, "registro-turistas-db.xlsx");
+    // El informe se arma en el servidor: la versión libre de SheetJS, que es la
+    // que corre en el navegador, no escribe estilos de celda y por eso el
+    // archivo salía sin colores ni bordes.
+    if(!useApi){
+      alert("El informe en Excel se genera en el servidor. Sin conexión al servidor compartido solo está disponible la exportación a CSV.");
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Generando informe…";
+    try{
+      const res = await fetch('/api/export/excel');
+      if(res.status === 401){
+        sesionIniciada = false;
+        volverAlLogin("Tu sesión venció. Vuelve a escribir la clave.");
+        return;
+      }
+      if(!res.ok) throw new Error('respuesta no OK del servidor');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "informe-registro-turistas-" + todayStr() + ".xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }catch(e){
+      console.error('[Registro de Turistas] No se pudo generar el informe.', e);
+      alert('No se pudo generar el informe. Revisa tu conexión e intenta de nuevo.');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   });
 
   function escapeHtml(str){
