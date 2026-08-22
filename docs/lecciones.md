@@ -188,3 +188,39 @@ tocar código: es barato y evita repetir lo que ya costó caro.
   propiedad a una regla existente, leer el bloque entero primero: puede estar ya
   declarada más abajo.
 
+---
+
+## 2026-08-22 — El eje del gráfico mostraba "30%35%" encimado
+
+- **Qué pasó:** Julio marcó que en "Rango de edad" el eje se leía `30%35%`.
+- **Causa raíz:** la escala se topaba en un valor de una tabla que incluía 35,
+  que **no es múltiplo del paso que Chart.js elige** (10). Entonces repartía las
+  marcas 0-10-20-30 con su propio paso y **además dibujaba la del tope**: el 35
+  quedaba a 21px del 30, en un eje de 151px. Los topes 25 y 75 tenían el mismo
+  defecto latente.
+- **Cómo se corrigió:** cada tope va ahora con su propio paso y el tope es
+  siempre múltiplo del paso (`ESCALAS_PCT`). Se eliminaron los topes 25, 35 y
+  75. Además `autoSkip:true` y `maxRotation:0` como red de seguridad.
+- **Regla para no repetirlo:** al fijar el máximo de un eje a mano, **fijar
+  también el paso, y que el máximo sea múltiplo exacto del paso** — si no, la
+  librería agrega una marca extra en el tope que se encima con la anterior.
+
+---
+
+## 2026-08-22 — Chart.js recortaba los nombres largos del eje sin avisar
+
+- **Qué pasó:** el gráfico "Motivo del viaje" mostraba `a familiares o amigos`.
+  La categoría real es **"Visita a familiares o amigos"**: el recorte no ponía
+  puntos suspensivos, así que la etiqueta **decía otra cosa** y parecía válida.
+- **Causa raíz:** Chart.js limita el ancho de las etiquetas del eje de
+  categorías y corta el texto en silencio.
+- **Cómo se corrigió:** un `callback` que parte la etiqueta en dos renglones por
+  el espacio más cercano a la mitad, **solo si la barra tiene alto suficiente**
+  (≥26px). Con 18 categorías quedan 13px por barra y ahí dos renglones se
+  encimarían, que es peor. Se agregó también el nombre completo al tooltip.
+- **Regla para no repetirlo:** un recorte sin puntos suspensivos es peor que un
+  texto ilegible, porque **se lee como si fuera el dato**. Al revisar gráficos,
+  comparar cada etiqueta con su valor de origen, no solo mirar si "se ve bien".
+  Y al partir etiquetas en dos líneas, revisar que la librería no empiece a
+  saltarse categorías (`autoSkip:false` en el eje de categorías).
+

@@ -833,12 +833,32 @@
   // gráfico cuya barra más alta era 11% dejaba el 89% del ancho vacío y ninguna
   // barra se podía comparar con otra. Ahora se ajusta al dato, subiendo al
   // siguiente corte "redondo" para que el eje siga siendo fácil de leer.
-  const CORTES_PCT = [5,10,15,20,25,30,35,40,50,60,75,100];
+  // Cada tope va con SU paso, y el tope es siempre múltiplo del paso. Si no lo
+  // fuera, Chart.js reparte las marcas con un paso propio y ADEMÁS dibuja la
+  // del tope: con tope 35 salían 0-10-20-30 y un 35 pegado al 30, ilegible en
+  // un eje de 150px. Por eso ya no existen los topes 25, 35 y 75.
+  const ESCALAS_PCT = [
+    [5,1], [10,5], [15,5], [20,5], [30,10], [40,10], [50,25], [60,20], [80,20], [100,25],
+  ];
   function escalaPct(percents){
     const max = percents.length ? Math.max.apply(null, percents) : 0;
     const holgado = max * 1.05;
-    for(const c of CORTES_PCT){ if(c >= holgado) return c; }
-    return 100;
+    for(const [tope,paso] of ESCALAS_PCT){ if(tope >= holgado) return { max:tope, paso }; }
+    return { max:100, paso:25 };
+  }
+
+  // Parte una etiqueta larga en dos líneas por el espacio más cercano a la
+  // mitad. Chart.js acepta un arreglo de textos y los apila.
+  function partirEtiqueta(texto, limite = 16){
+    const t = String(texto == null ? "" : texto);
+    if(t.length <= limite) return t;
+    const mitad = Math.floor(t.length / 2);
+    let corte = -1, mejor = Infinity;
+    for(let i = 0; i < t.length; i++){
+      if(t[i] === " " && Math.abs(i - mitad) < mejor){ mejor = Math.abs(i - mitad); corte = i; }
+    }
+    if(corte === -1) return t;
+    return [t.slice(0, corte), t.slice(corte + 1)];
   }
 
   function makePercentBar(canvasId, entries, denom, colorOffset){
@@ -850,6 +870,7 @@
     const counts = entries.map(e=>e[1]);
     const percents = counts.map(c => denom ? +(c/denom*100).toFixed(1) : 0);
     const baseColors = labels.map((_,i)=> PALETTE[(i+colorOffset) % PALETTE.length]);
+    const esc = escalaPct(percents);
     chartInstances[canvasId] = new Chart(ctx, {
       type: "bar",
       data: { labels, datasets: [{
@@ -861,12 +882,44 @@
         indexAxis: "y",
         responsive:true, maintainAspectRatio:false,
         scales: {
-          x: { min:0, max: escalaPct(percents), ticks:{ callback:(v)=>v+"%" }, grid:{ color:"rgba(34,32,27,0.08)" } },
-          y: { grid:{ display:false } }
+          x: {
+            min:0, max: esc.max,
+            ticks:{
+              stepSize: esc.paso,
+              callback:(v)=>v+"%",
+              // Red de seguridad: si aun asi no caben, se saltan marcas antes
+              // que rotarlas o encimarlas.
+              autoSkip:true, maxRotation:0,
+            },
+            grid:{ color:"rgba(34,32,27,0.08)" },
+          },
+          y: {
+            grid:{ display:false },
+            ticks:{
+              // Chart.js RECORTA las etiquetas largas del eje sin avisar: "Visita
+              // a familiares o amigos" se leía "a familiares o amigos", que dice
+              // otra cosa. Devolver un arreglo las parte en dos líneas.
+              // Solo se parte si la barra tiene alto para dos renglones. En los
+              // gráficos de 18 categorías quedan 13px por barra: ahí dos líneas
+              // se encimarían, que es peor que una recortada.
+              callback: function(v, _i, marcas){
+                const t = this.getLabelForValue(v);
+                const altoPorBarra = this.height / Math.max(1, marcas.length);
+                return altoPorBarra >= 26 ? partirEtiqueta(t) : t;
+              },
+              // Al ocupar dos líneas, Chart.js empezaba a saltarse categorías
+              // enteras: desaparecían "Surf" y "Evento". Acá cada barra DEBE
+              // tener su nombre; si aprietan, el que crece es el alto del
+              // recuadro, no la lista de etiquetas.
+              autoSkip:false,
+            },
+          }
         },
         plugins:{
           legend:{ display:false },
-          tooltip:{ callbacks:{ label: (c)=> `${c.raw}% (${counts[c.dataIndex].toLocaleString('es-CL')} de ${denom.toLocaleString('es-CL')})` } }
+          tooltip:{ callbacks:{
+            title: (it)=> labels[it[0].dataIndex],
+            label: (c)=> `${c.raw}% (${counts[c.dataIndex].toLocaleString('es-CL')} de ${denom.toLocaleString('es-CL')})` } }
         }
       }
     });
