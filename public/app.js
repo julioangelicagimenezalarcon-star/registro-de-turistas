@@ -390,8 +390,28 @@
       $("panel-"+btn.dataset.tab).classList.add("active");
       if(btn.dataset.tab === "panel"){ await refreshFromApi(); renderPanel(); }
       if(btn.dataset.tab === "historial"){ await refreshFromApi(); renderHistorial(); }
+      if(btn.dataset.tab === "informe"){ await renderInforme(); }
     });
   });
+
+  // ---------- Botones del Informe ----------
+  // Al pasar a modo impresión el ancho de la hoja es menor que el de la
+  // pantalla. Chart.js no siempre alcanza a reajustar el canvas solo, y el
+  // gráfico saldría cortado en el PDF: se le pide el resize a mano.
+  window.addEventListener("beforeprint", ()=>{
+    Object.keys(chartInstances).forEach(id=>{
+      try{ chartInstances[id] && chartInstances[id].resize(); }catch(e){}
+    });
+  });
+
+  const infPdf = $("informe-pdf-btn");
+  if(infPdf) infPdf.addEventListener("click", ()=>{
+    // El PDF lo genera el propio navegador al imprimir. No hace falta ninguna
+    // librería ni que el servidor cargue un Chrome headless.
+    window.print();
+  });
+  const infRec = $("informe-recargar-btn");
+  if(infRec) infRec.addEventListener("click", ()=> renderInforme(true));
 
   // ---------- Chips (servicios) + dropdowns (atractivos, alojamiento, transporte) ----------
   function setupDropdownMultiselect({toggleId, panelId, containerId, getOptions, selectedSet, emptyLabel, singular, plural}){
@@ -1621,5 +1641,276 @@
     }
     loadState();
   }
+
+  // ======================= INFORME (pestaña) =======================
+  // El informe de presentación. El Excel quedó como planilla de trabajo; esto es
+  // lo que se le muestra al concejo o se manda en PDF. La narrativa NO se calcula
+  // acá: viene de /api/informe, que ejecuta las mismas funciones que arma el
+  // Excel. Una sola fuente, para que los dos no puedan contradecirse.
+
+  const INF = {
+    verde:"#5A9A28", verdeClaro:"#7DC040", verde700:"#3D7317", verde800:"#264E0E",
+    oro:"#F2B33D", mar:"#17655E", marClaro:"#2FB3A8", tierra:"#A63D2F", tinta:"#14150E",
+  };
+  // Serie fija para las categóricas. Estática a propósito: Chart.js con colores
+  // calculados por callback tumbaba el Panel entero en Safari/iOS.
+  const INF_SERIE = [INF.verdeClaro, INF.mar, INF.oro, INF.verde700, INF.marClaro, INF.tierra, INF.verde800, "#6B6558"];
+
+  let informeCargado = false;
+
+  const nf = (n) => (Number(n)||0).toLocaleString('es-CL');
+  const nf1 = (n) => (Number(n)||0).toLocaleString('es-CL',{minimumFractionDigits:1, maximumFractionDigits:1});
+
+  function mesLargo(ym){
+    const M = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    const [a,m] = String(ym).split("-");
+    return M[Number(m)-1] ? `${M[Number(m)-1]} ${a}` : ym;
+  }
+  function fechaLarga(iso){
+    if(!iso) return "";
+    const [a,m,d] = String(iso).split("-").map(Number);
+    const M = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    return `${d} de ${M[m-1]} de ${a}`;
+  }
+  const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  // Convierte el texto narrado (con saltos de línea) en párrafos.
+  function parrafos(texto){
+    return String(texto||"").split("\n").filter(l=>l.trim())
+      .map(l=>`<p>${esc(l)}</p>`).join("");
+  }
+
+  function bloqueRanking(titulo, entradas, denom, unidad, limite){
+    const top = (entradas||[]).slice(0, limite||6);
+    if(!top.length) return "";
+    const max = top[0] ? top[0][1] : 0;
+    const filas = top.map(([k,v],i)=>{
+      const ancho = max ? Math.round(v/max*100) : 0;
+      // pct() devuelve punto decimal; el texto narrado usa coma. Sin esto el
+      // mismo documento mostraba "46,0%" en el párrafo y "62.8%" en la lista.
+      const p = denom ? ` · ${pct(v,denom).replace(".", ",")}%` : "";
+      return `<li><span class="rk-n">${i+1}</span>
+        <span class="rk-txt">${esc(k)}</span>
+        <span class="rk-bar"><i style="width:${ancho}%"></i></span>
+        <span class="rk-val">${nf(v)}${p}</span></li>`;
+    }).join("");
+    return `<div class="rk"><h4>${esc(titulo)}</h4><ol>${filas}</ol>
+      <p class="rk-pie">${esc(unidad||"")}</p></div>`;
+  }
+
+  function seccionHTML(n, sec, extra){
+    // El título ya viene numerado desde el servidor ("1. Cuánta gente llegó…").
+    // Como acá el número va en su propio círculo, se le quita el prefijo para
+    // que no salga dos veces.
+    const titulo = String(sec.titulo||"").replace(/^\s*\d+\.\s*/, "");
+    return `<section class="inf-sec" id="inf-sec-${n}">
+      <h3><span class="inf-num">${n}</span>${esc(titulo)}</h3>
+      <div class="inf-texto">${parrafos(sec.texto)}</div>
+      ${extra||""}
+    </section>`;
+  }
+
+  function lienzo(id, alto){
+    return `<div class="inf-chart" style="height:${alto||260}px"><canvas id="${id}"></canvas></div>`;
+  }
+
+  async function renderInforme(forzar){
+    const doc = $("informe-doc");
+    if(!doc) return;
+    if(informeCargado && !forzar) return;
+    doc.innerHTML = `<p class="inf-cargando">Preparando el informe…</p>`;
+
+    let data;
+    try{
+      const res = await fetch('/api/informe');
+      if(res.status === 401){ volverAlLogin(); return; }
+      if(res.status === 404){
+        doc.innerHTML = `<div class="inf-vacio"><h2>Todavía no hay registros</h2>
+          <p>El informe se arma solo cuando haya al menos una atención registrada.</p></div>`;
+        return;
+      }
+      if(!res.ok) throw new Error('informe no disponible');
+      data = await res.json();
+    }catch(e){
+      doc.innerHTML = `<div class="inf-vacio"><h2>No se pudo armar el informe</h2>
+        <p>Revisa la conexión y vuelve a intentar con el botón Actualizar.</p></div>`;
+      return;
+    }
+
+    const a = data.analisis, secs = data.secciones || [];
+    const hoy = new Date();
+    const emitido = `${hoy.getDate()} de ${["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][hoy.getMonth()]} de ${hoy.getFullYear()}`;
+
+    const kpis = [
+      ["Turistas atendidos", nf(a.turistas), "personas"],
+      ["Atenciones registradas", nf(a.n), "grupos"],
+      ["Grupo promedio", nf1(a.grupoMedio), "personas por grupo"],
+      ["Días con actividad", nf(a.diasConRegistro), "jornadas"],
+    ].map(([t,v,u])=>`<div class="inf-kpi"><span class="k-t">${t}</span>
+        <span class="k-v">${v}</span><span class="k-u">${u}</span></div>`).join("");
+
+    doc.innerHTML = `
+      <header class="inf-portada">
+        <div class="inf-portada-txt">
+          <p class="inf-org">I. Municipalidad de Cobquecura · La Costa de Ñuble</p>
+          <h1>Informe de Registro de Turistas</h1>
+          <p class="inf-periodo">Período del ${fechaLarga(a.desde)} al ${fechaLarga(a.hasta)}</p>
+        </div>
+        <p class="inf-emitido">Emitido el ${emitido}</p>
+      </header>
+
+      <div class="inf-kpis">${kpis}</div>
+
+      ${secs[0] ? seccionHTML(1, secs[0], `
+        <div class="inf-grid-2">
+          ${lienzo("inf-ch-mes", 260)}
+          ${lienzo("inf-ch-flujo", 260)}
+        </div>`) : ""}
+
+      ${secs[1] ? seccionHTML(2, secs[1], lienzo("inf-ch-dia", 280)) : ""}
+
+      ${secs[2] ? seccionHTML(3, secs[2], `
+        <div class="inf-grid-2">
+          ${lienzo("inf-ch-region", 280)}
+          ${bloqueRanking("Orígenes más frecuentes", a.porProcedencia, a.n, "Grupos por comuna de origen; los extranjeros figuran por su país.", 6)}
+        </div>`) : ""}
+
+      ${secs[3] ? seccionHTML(4, secs[3], `
+        <div class="inf-grid-2">
+          ${lienzo("inf-ch-sexo", 260)}
+          ${lienzo("inf-ch-edad", 260)}
+        </div>`) : ""}
+
+      ${secs[4] ? seccionHTML(5, secs[4], lienzo("inf-ch-motivo", 300)) : ""}
+
+      ${secs[5] ? seccionHTML(6, secs[5], `
+        <div class="inf-grid-2">
+          ${bloqueRanking("Atractivos más consultados", a.atractivos, a.n, "Veces que se mencionó en una atención.", 7)}
+          ${bloqueRanking("Servicios más requeridos", a.servicios, a.n, "Veces que se mencionó en una atención.", 7)}
+        </div>`) : ""}
+
+      <section class="inf-conclusion">
+        <h3>En resumen</h3>
+        ${parrafos(data.conclusion)}
+      </section>
+
+      <footer class="inf-pie">
+        <p>Registro de Turistas · I. Municipalidad de Cobquecura</p>
+        <p>Informe generado automáticamente a partir de ${nf(data.total)} atenciones registradas.</p>
+      </footer>`;
+
+    dibujarGraficosInforme(a);
+    informeCargado = true;
+  }
+
+  function dibujarGraficosInforme(a){
+    if(!hasChart) return;
+    // Sin animación: si el usuario imprime apenas abre, un canvas a medio animar
+    // se congela en el PDF a medio dibujar.
+    const base = {
+      responsive:true, maintainAspectRatio:false,
+      animation:false,
+      plugins:{ legend:{ display:false } },
+    };
+    const ejeY = { beginAtZero:true, grid:{ color:"rgba(20,21,14,0.08)" }, ticks:{ precision:0 } };
+    const ejeXlimpio = { grid:{ display:false } };
+
+    const mk = (id, cfg) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      destroyChart(id);
+      chartInstances[id] = new Chart(el, cfg);
+    };
+
+    // 1a. Turistas por mes
+    const meses = a.porMes || [];
+    mk("inf-ch-mes", {
+      type:"bar",
+      data:{ labels: meses.map(m=>mesLargo(m[0])), datasets:[{ data: meses.map(m=>m[1]),
+        backgroundColor: INF.verdeClaro, borderRadius:6, maxBarThickness:56 }] },
+      options:{ ...base, scales:{ x:ejeXlimpio, y:ejeY },
+        plugins:{ ...base.plugins, title:{ display:true, text:"Turistas por mes", font:{size:13,weight:"600"} } } }
+    });
+
+    // 1b. Flujo diario (línea) — se ordena por fecha, no por magnitud
+    const flujo = [...(a.porFecha||[])].sort((x,y)=> x[0]<y[0]?-1:1);
+    mk("inf-ch-flujo", {
+      type:"line",
+      data:{ labels: flujo.map(f=>f[0]), datasets:[{ data: flujo.map(f=>f[1]),
+        borderColor: INF.mar, backgroundColor:"rgba(23,101,94,0.12)",
+        fill:true, tension:0.3, pointRadius:0, borderWidth:2 }] },
+      options:{ ...base,
+        scales:{ x:{ ...ejeXlimpio, ticks:{ maxTicksLimit:6, maxRotation:0 } }, y:ejeY },
+        plugins:{ ...base.plugins, title:{ display:true, text:"Flujo diario de turistas", font:{size:13,weight:"600"} } } }
+    });
+
+    // 2. Día de la semana — el peak en dorado
+    const dias = a.porDiaSemana || [];
+    const maxDia = Math.max.apply(null, dias.map(d=>d[1]).concat([0]));
+    mk("inf-ch-dia", {
+      type:"bar",
+      data:{ labels: DIAS_SEMANA_CORTO, datasets:[{ data: dias.map(d=>d[1]),
+        backgroundColor: dias.map(d => (maxDia>0 && d[1]===maxDia) ? INF.oro : INF.verde),
+        borderRadius:6, maxBarThickness:60 }] },
+      options:{ ...base, scales:{ x:ejeXlimpio, y:ejeY },
+        plugins:{ ...base.plugins, title:{ display:true, text:"Turistas acumulados por día de la semana", font:{size:13,weight:"600"} } } }
+    });
+
+    // 3. Procedencia por región (barras horizontales: los nombres son largos)
+    const reg = (a.porRegion||[]).slice(0,8);
+    // En barras horizontales el nombre largo se come el área del gráfico y en
+    // pantalla angosta queda cortado por la izquierda.
+    const cortoReg = (t)=>{
+      const s = String(t||"");
+      if(s.length <= 20) return s;
+      return s.replace(/^Metropolitana de Santiago$/, "R. Metropolitana")
+              .replace(/^Libertador General Bernardo O.Higgins$/, "O'Higgins")
+              .replace(/^Aysén del General Carlos Ibáñez del Campo$/, "Aysén")
+              .replace(/^Magallanes.*$/, "Magallanes")
+              .slice(0, 22);
+    };
+    mk("inf-ch-region", {
+      type:"bar",
+      data:{ labels: reg.map(r=>cortoReg(r[0])), datasets:[{ data: reg.map(r=>r[1]),
+        backgroundColor: reg.map((_,i)=>INF_SERIE[i % INF_SERIE.length]), borderRadius:5 }] },
+      options:{ ...base, indexAxis:"y",
+        scales:{ x:{ beginAtZero:true, grid:{ color:"rgba(20,21,14,0.08)" }, ticks:{precision:0} }, y:{ grid:{display:false} } },
+        plugins:{ ...base.plugins,
+          tooltip:{ callbacks:{ title:(it)=> reg[it[0].dataIndex] ? reg[it[0].dataIndex][0] : "" } },
+          title:{ display:true, text:"Grupos por región de origen", font:{size:13,weight:"600"} } } }
+    });
+
+    // 4a. Sexo
+    mk("inf-ch-sexo", {
+      type:"doughnut",
+      data:{ labels:["Femenino","Masculino"], datasets:[{ data:[a.femenino||0, a.masculino||0],
+        backgroundColor:[INF.oro, INF.mar], borderWidth:2, borderColor:"#FFFFFF" }] },
+      options:{ ...base, cutout:"58%",
+        plugins:{ legend:{ display:true, position:"bottom" },
+          title:{ display:true, text:"Composición por sexo", font:{size:13,weight:"600"} } } }
+    });
+
+    // 4b. Tramos de edad
+    const ed = a.edades || [];
+    mk("inf-ch-edad", {
+      type:"bar",
+      data:{ labels: ed.map(e=>e[0]), datasets:[{ data: ed.map(e=>e[1]),
+        backgroundColor: INF.verde700, borderRadius:5, maxBarThickness:48 }] },
+      options:{ ...base, scales:{ x:{ ...ejeXlimpio, ticks:{ maxRotation:0, autoSkip:false, font:{size:10} } }, y:ejeY },
+        plugins:{ ...base.plugins, title:{ display:true, text:"Personas por tramo de edad", font:{size:13,weight:"600"} } } }
+    });
+
+    // 5. Motivo de viaje
+    const mot = (a.porMotivo||[]).slice(0,8);
+    mk("inf-ch-motivo", {
+      type:"bar",
+      data:{ labels: mot.map(m=>m[0]), datasets:[{ data: mot.map(m=>m[1]),
+        backgroundColor: mot.map((_,i)=>INF_SERIE[i % INF_SERIE.length]), borderRadius:5 }] },
+      options:{ ...base, indexAxis:"y",
+        scales:{ x:{ beginAtZero:true, grid:{ color:"rgba(20,21,14,0.08)" }, ticks:{precision:0} }, y:{ grid:{display:false} } },
+        plugins:{ ...base.plugins, title:{ display:true, text:"Motivo declarado del viaje", font:{size:13,weight:"600"} } } }
+    });
+  }
+
   bootstrap();
 })();

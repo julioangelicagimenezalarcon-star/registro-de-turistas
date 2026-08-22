@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 const { Pool } = require("pg");
 const crypto = require("crypto");
-const { generarInforme } = require("./informe");
+const { generarInforme, analizar, narrar, concluir } = require("./informe");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -288,6 +288,24 @@ app.get("/api/export/excel", async (req, res) => {
     res.send(Buffer.from(buffer));
   } catch (e) {
     console.error("No se pudo generar el informe", e);
+    res.status(500).json({ error: "informe_error" });
+  }
+});
+
+// El mismo análisis del Excel, servido como datos para la pestaña Informe. Se
+// calcula en el servidor a propósito: `analizar`, `narrar` y `concluir` viven en
+// informe.js y son la única fuente de la narrativa. Duplicarlas en el navegador
+// abriría la puerta a que el Excel y la web digan cosas distintas.
+app.get("/api/informe", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM records WHERE eliminado_en IS NULL ORDER BY fecha DESC, id DESC LIMIT 20000");
+    const registros = rows.map(rowToRecord);
+    if (!registros.length) return res.status(404).json({ error: "sin_registros" });
+    const a = analizar(registros);
+    res.json({ analisis: a, secciones: narrar(a), conclusion: concluir(a), total: registros.length });
+  } catch (e) {
+    console.error("No se pudo armar el informe", e);
     res.status(500).json({ error: "informe_error" });
   }
 });
