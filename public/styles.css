@@ -1076,6 +1076,9 @@
   .informe-doc{
     max-width:none; margin:0; border-radius:0;
     box-shadow:none; background:#fff;
+    /* overflow:hidden rompe el calculo de saltos de pagina: el navegador trata
+       el bloque como una caja cerrada y parte lo que hay dentro. */
+    overflow:visible;
   }
 
   .inf-portada{
@@ -1089,25 +1092,38 @@
   }
   .inf-emitido{ margin-top:8px; white-space:normal; }
 
-  .inf-kpis, .inf-kpi, .inf-conclusion, .inf-pie, .rk-bar i, .inf-num{
+  .inf-kpis, .inf-kpi, .inf-conclusion, .inf-pie, .rk-bar i, .inf-num,
+  .inf-portada, .inf-sec h3{
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }
   /* El ancho util de una A4 con margenes queda bajo los 760px del breakpoint
      movil, asi que sin esto las cifras salen en 2x2 y las columnas apiladas. */
   .inf-kpis{ grid-template-columns:repeat(4,1fr) !important; }
-  .inf-grid-2{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:12px; }
+  .inf-grid-2{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px; }
   .inf-chart{ min-width:0; }
   .inf-chart canvas{ max-width:100% !important; }
 
-  /* Solo se protegen los bloques chicos. Proteger la seccion completa hacia
-     saltar secciones enteras de pagina y dejaba hojas medio vacias. */
-  .inf-chart, .rk, .inf-conclusion{
+  /* ---- Paginacion ----
+     La regla de oro: NADA que se pueda partir por la mitad debe poder
+     partirse. Se protege la seccion completa (titulo + texto + grafico), que
+     es la unidad que el lector entiende como una sola cosa.
+     Para que eso no deje hojas medio vacias, en papel los graficos se achican:
+     una seccion completa mide asi ~500px y entran dos por hoja. */
+  .inf-sec, .inf-conclusion, .inf-chart, .rk, .inf-grid-2, .inf-kpis, .inf-portada{
     break-inside:avoid; page-break-inside:avoid;
   }
   .inf-sec h3{ break-after:avoid; page-break-after:avoid; }
-  .inf-sec{ padding:14px 16px; }
-  .inf-conclusion{ padding:16px; }
-  .inf-pie{ padding:12px 16px; }
+  .inf-texto{ break-after:avoid; page-break-after:avoid; }
+
+  /* NO se toca el alto del grafico en impresion. El canvas de Chart.js
+     conserva el tamaño con que se dibujo en pantalla: si se achica la caja, el
+     dibujo se sale por abajo y se escribe encima de la seccion siguiente.
+     Eso era lo que se veia como "graficos partidos". */
+  .inf-chart{ padding:6px; overflow:visible; }
+  .inf-sec{ padding:12px 16px; }
+  .inf-conclusion{ padding:14px 16px; }
+  .inf-pie{ padding:10px 16px; }
+  .inf-sec > .inf-chart, .inf-grid-2{ margin-top:10px; }
 
   .inf-texto p, .inf-conclusion p{ font-size:10.5pt; line-height:1.5; }
   .inf-portada h1{ font-size:20pt; }

@@ -127,3 +127,46 @@ tocar código: es barato y evita repetir lo que ya costó caro.
   **ocultar, no eliminar** — y si el resultado se ve peor de lo esperado,
   sospechar del método de aislamiento antes que del archivo. Es la tercera vez
   en el mismo día que el verificador miente (ver la del fondo negro).
+
+---
+
+## 2026-08-22 — Los gráficos se salían de su caja en el PDF y pisaban el texto
+
+- **Qué pasó:** Julio reportó que el PDF del informe salía con los gráficos
+  partidos entre páginas. El título de la sección 3 aparecía escrito **encima**
+  del gráfico de la sección 2.
+- **Causa raíz:** no era la paginación. En `@media print` se forzaba
+  `.inf-chart { height:190px }` para que los bloques cupieran mejor, pero
+  **el canvas de Chart.js conserva el tamaño con el que se dibujó en pantalla**
+  (258px). Al achicar la caja, el dibujo se salía por abajo y se superponía con
+  lo que venía después. El `beforeprint` que llama a `resize()` no siempre
+  alcanza a ejecutarse antes de que el navegador capture la página, así que
+  depender de él no sirve.
+- **Cómo se corrigió:** en impresión **no se toca el alto del gráfico**. Se
+  protege la sección completa con `break-inside:avoid` y se comprobó que ninguna
+  supera el alto de una hoja (miden 436–497px; la hoja más chica probada tiene
+  930px útiles). También se quitó `overflow:hidden` de `.informe-doc`, que
+  estorba el cálculo de saltos de página.
+- **Regla para no repetirlo:** **nunca cambiar por CSS el alto de un contenedor
+  que tiene un `<canvas>` adentro** — el canvas no se encoge con él. Si hay que
+  achicar un gráfico para impresión, se redibuja por JavaScript, no por CSS.
+
+---
+
+## 2026-08-22 — Di por buena una paginación que nunca comprobé
+
+- **Qué pasó:** afirmé que el PDF estaba verificado. Julio abrió el archivo y
+  los gráficos estaban partidos.
+- **Causa raíz:** revisé las páginas como imágenes a 1000px de ancho y busqué
+  que el texto estuviera completo. Un gráfico desbordado sobre el texto
+  siguiente no salta a la vista a ese tamaño, y **nunca probé más que una sola
+  combinación de papel y márgenes** — la que yo mismo elegí en el script.
+- **Cómo se corrigió:** se midió en el DOM, bajo `media=print`, el alto de cada
+  bloque protegido contra el alto útil de la hoja, en cuatro combinaciones de
+  papel y márgenes (A4 y Carta, márgenes chicos y de una pulgada). Eso da un
+  número, no una impresión.
+- **Regla para no repetirlo:** para dar por buena una impresión, **medir el alto
+  de cada bloque atómico contra el alto útil de la página**, y hacerlo con el
+  papel más chico y los márgenes más grandes que el usuario pueda tener. Mirar
+  una miniatura del PDF no es verificar.
+
