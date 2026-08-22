@@ -32,6 +32,7 @@ const C = {
   gris: "FF6B6558",
   linea: "FFD8D2C4",
   mar: "FF17655E",
+  alerta: "FFA63D2F",
 };
 
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -48,6 +49,14 @@ const nombreMes = (ym) => {
   const [y,m] = String(ym).split("-").map(Number);
   if (!y || !m) return ym;
   return `${MESES[m-1].charAt(0).toUpperCase()+MESES[m-1].slice(1)} ${y}`;
+};
+// AAAAMM como número. El tablero compara contra esto y no contra el texto del
+// mes: si el usuario escribe una fecha en el selector, Excel la guarda como
+// número y la comparación de texto fallaba en silencio, mostrando ceros.
+const mesNumero = (fecha) => {
+  const s = String(fecha||"");
+  const y = Number(s.slice(0,4)), m = Number(s.slice(5,7));
+  return (y && m) ? y*100 + m : 0;
 };
 const mesEnFrase = (ym) => {
   const [y,m] = String(ym).split("-").map(Number);
@@ -237,9 +246,9 @@ function borde(color = C.linea, style = "thin") {
            bottom:{style,color:{argb:color}}, right:{style,color:{argb:color}} };
 }
 
-function tituloSeccion(ws, fila, texto, ancho = 6) {
-  ws.mergeCells(fila, 1, fila, ancho);
-  const c = ws.getCell(fila, 1);
+function tituloSeccion(ws, fila, texto, ancho = 6, desdeCol = 1) {
+  ws.mergeCells(fila, desdeCol, fila, desdeCol + ancho - 1);
+  const c = ws.getCell(fila, desdeCol);
   c.value = texto;
   c.font = { name:"Calibri", size:12, bold:true, color:{argb:C.blanco} };
   c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde700} };
@@ -248,9 +257,9 @@ function tituloSeccion(ws, fila, texto, ancho = 6) {
   return fila + 1;
 }
 
-function encabezadoTabla(ws, fila, cols) {
+function encabezadoTabla(ws, fila, cols, desdeCol = 1) {
   cols.forEach((t, i) => {
-    const c = ws.getCell(fila, i+1);
+    const c = ws.getCell(fila, i + desdeCol);
     c.value = t;
     c.font = { name:"Calibri", size:10, bold:true, color:{argb:C.blanco} };
     c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde800} };
@@ -263,7 +272,7 @@ function encabezadoTabla(ws, fila, cols) {
 
 /** Tabla de ranking con % y barra de datos. Devuelve la fila siguiente. */
 function tablaRanking(ws, fila, titulo, entradas, denom, etiquetaDenom, limite = 12) {
-  fila = tituloSeccion(ws, fila, titulo, 4);
+  fila = tituloSeccion(ws, fila, titulo, 4, 1);
   fila = encabezadoTabla(ws, fila, ["Categoría", "Cantidad", "% " + etiquetaDenom, "Peso relativo"]);
   const desde = fila;
   const lista = entradas.slice(0, limite);
@@ -406,7 +415,13 @@ function hojaResumen(wb, a, secciones, conclusion) {
 }
 
 function hojaDashboard(wb, a, nFilas) {
-  const ws = wb.addWorksheet("Dashboard", { views:[{ showGridLines:false }] });
+  // Sin fitToWidth el tablero se parte al imprimir y la última cifra
+  // ("Grupo medio") termina sola en otra hoja.
+  const ws = wb.addWorksheet("Dashboard", {
+    views:[{ showGridLines:false }],
+    pageSetup:{ paperSize:9, orientation:"portrait", fitToPage:true, fitToWidth:1, fitToHeight:0,
+                margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3} },
+  });
   ws.columns = [{width:3},{width:28},{width:16},{width:16},{width:16},{width:16},{width:16}];
   const F = nFilas + 1;   // última fila con datos en la hoja Datos
 
@@ -441,7 +456,37 @@ function hojaDashboard(wb, a, nFilas) {
   sel.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde} };
   sel.border = borde(C.verde700, "medium");
   sel.alignment = { horizontal:"center" };
+  // Formato Texto: sin esto Excel puede convertir "Diciembre 2026" en la fecha
+  // 01/12/2026 al elegirla, y entonces ninguna comparación calza.
+  sel.numFmt = "@";
   ws.mergeCells("C5:D5");
+
+  // Criterio normalizado (columna oculta). Traduce lo que haya en el selector a
+  // un AAAAMM comparable: 0 = toda la temporada, -1 = no existe.
+  // Acepta tanto el texto de la lista como una fecha escrita a mano, que es lo
+  // que la gente hace cuando el desplegable no salta.
+  const cri = ws.getCell("I5");
+  cri.value = { formula:
+    `IF($C$5="Toda la temporada",0,` +
+    `IF(ISNUMBER($C$5),YEAR($C$5)*100+MONTH($C$5),` +
+    `IFERROR(INDEX(Datos!$S$2:$S$${F},MATCH($C$5,Datos!$B$2:$B$${F},0)),-1)))` };
+  ws.getColumn(9).hidden = true;
+
+  // Un tablero que muestra 0 sin explicar por qué es peor que uno que avisa.
+  const aviso = ws.getCell("B6");
+  // Dos formas de quedarse sin datos, y las dos tienen que hablar:
+  //  -1  = lo escrito no corresponde a ningún período conocido.
+  //  mes válido pero sin registros = pasa cuando alguien escribe una fecha y
+  //  Excel la interpreta con otro orden de día/mes. Antes salían ceros mudos.
+  aviso.value = { formula:
+    `IF($I$5=-1,"Ese período no existe. Elige uno de la lista desplegable de la casilla verde.",` +
+    `IF(AND($I$5<>0,COUNTIF(Datos!$S$2:$S$${F},$I$5)=0),` +
+    `"Se entendió el mes "&LEFT(TEXT($I$5,"000000"),4)&"-"&RIGHT(TEXT($I$5,"000000"),2)&", que no tiene registros. Elige un período de la lista desplegable.",` +
+    `""))` };
+  aviso.font = { name:"Calibri", size:9, bold:true, color:{argb:C.alerta} };
+  aviso.alignment = { vertical:"middle" };
+  ws.mergeCells("B6:G6");
+  ws.getRow(6).height = 14;
 
   // KPIs que dependen del selector.
   const kpi = (col, titulo, formula, fmt) => {
@@ -459,33 +504,35 @@ function hojaDashboard(wb, a, nFilas) {
     cV.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
     cV.border = { bottom:borde().bottom, left:borde().left, right:borde().right };
   };
-  const todo = `$C$5="Toda la temporada"`;
-  kpi(2, "Turistas", `IF(${todo},SUM(Datos!J2:J${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!J2:J${F}))`, "#,##0");
-  kpi(3, "Atenciones", `IF(${todo},COUNTA(Datos!A2:A${F}),COUNTIF(Datos!B2:B${F},$C$5))`, "#,##0");
-  kpi(4, "Femenino", `IFERROR(IF(${todo},SUM(Datos!H2:H${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!H2:H${F}))/B8,0)`, "0.0%");
-  kpi(5, "Masculino", `IFERROR(IF(${todo},SUM(Datos!I2:I${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!I2:I${F}))/B8,0)`, "0.0%");
-  kpi(6, "Grupo medio", `IFERROR(B8/C8,0)`, "0.0");
+  const todo = `$I$5=0`;
+  const S = `Datos!$S$2:$S$${F}`;
+  kpi(2, "Turistas", `IF(${todo},SUM(Datos!$J$2:$J$${F}),SUMIF(${S},$I$5,Datos!$J$2:$J$${F}))`, "#,##0");
+  kpi(3, "Atenciones", `IF(${todo},COUNTA(Datos!$A$2:$A$${F}),COUNTIF(${S},$I$5))`, "#,##0");
+  kpi(4, "Femenino", `IFERROR(IF(${todo},SUM(Datos!$H$2:$H$${F}),SUMIF(${S},$I$5,Datos!$H$2:$H$${F}))/$B$8,0)`, "0.0%");
+  kpi(5, "Masculino", `IFERROR(IF(${todo},SUM(Datos!$I$2:$I$${F}),SUMIF(${S},$I$5,Datos!$I$2:$I$${F}))/$B$8,0)`, "0.0%");
+  kpi(6, "Grupo medio", `IFERROR($B$8/$C$8,0)`, "0.0");
   ws.getRow(7).height = 16;
   ws.getRow(8).height = 28;
 
   // Tablas vivas: también responden al selector.
   let fila = 10;
   const tablaViva = (titulo, etiquetas, colDatos) => {
-    fila = tituloSeccion(ws, fila, titulo, 4);
-    fila = encabezadoTabla(ws, fila, ["Categoría", "Turistas", "% del período", "Peso relativo"]);
+    // Desde la columna B: la A mide 3 de ancho y las etiquetas salían cortadas.
+    fila = tituloSeccion(ws, fila, titulo, 4, 2);
+    fila = encabezadoTabla(ws, fila, ["Categoría", "Turistas", "% del período", "Peso relativo"], 2);
     const desde = fila;
     etiquetas.forEach((et, i) => {
       const par = i % 2 === 0;
       const f = fila;
-      const cN = ws.getCell(f, 1); cN.value = et;
-      const cV = ws.getCell(f, 2);
-      cV.value = { formula: `IF(${todo},SUMIF(Datos!${colDatos}2:${colDatos}${F},$A${f},Datos!$J2:$J${F}),SUMIFS(Datos!$J2:$J${F},Datos!${colDatos}2:${colDatos}${F},$A${f},Datos!$B2:$B${F},$C$5))` };
+      const cN = ws.getCell(f, 2); cN.value = et;
+      const cV = ws.getCell(f, 3);
+      cV.value = { formula: `IF(${todo},SUMIF(Datos!$${colDatos}$2:$${colDatos}$${F},$B${f},Datos!$J$2:$J$${F}),SUMIFS(Datos!$J$2:$J$${F},Datos!$${colDatos}$2:$${colDatos}$${F},$B${f},Datos!$S$2:$S$${F},$I$5))` };
       cV.numFmt = "#,##0";
-      const cP = ws.getCell(f, 3);
-      cP.value = { formula: `IFERROR($B${f}/$B$8,0)` };
+      const cP = ws.getCell(f, 4);
+      cP.value = { formula: `IFERROR($C${f}/$B$8,0)` };
       cP.numFmt = "0.0%";
-      const cB = ws.getCell(f, 4);
-      cB.value = { formula: `$B${f}` };
+      const cB = ws.getCell(f, 5);
+      cB.value = { formula: `$C${f}` };
       [cN,cV,cP,cB].forEach((c, j) => {
         c.border = borde();
         c.fill = { type:"pattern", pattern:"solid", fgColor:{argb: par ? C.blanco : C.papel} };
@@ -496,7 +543,7 @@ function hojaDashboard(wb, a, nFilas) {
       fila++;
     });
     ws.addConditionalFormatting({
-      ref: `D${desde}:D${fila-1}`,
+      ref: `E${desde}:E${fila-1}`,
       rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde600}, gradient:false }],
     });
     fila += 1;
@@ -509,7 +556,11 @@ function hojaDashboard(wb, a, nFilas) {
 }
 
 function hojaAnalisis(wb, a) {
-  const ws = wb.addWorksheet("Análisis", { views:[{ showGridLines:false }] });
+  const ws = wb.addWorksheet("Análisis", {
+    views:[{ showGridLines:false }],
+    pageSetup:{ paperSize:9, orientation:"portrait", fitToPage:true, fitToWidth:1, fitToHeight:0,
+                margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3} },
+  });
   ws.columns = [{width:34},{width:14},{width:14},{width:16},{width:14}];
   let fila = 1;
   ws.mergeCells("A1:D1");
@@ -540,6 +591,9 @@ function hojaDatos(wb, records) {
     ["Informador", 18], ["Femenino", 10], ["Masculino", 10], ["Total", 8],
     ["Menor de 18", 12], ["18 a 29", 10], ["30 a 40", 10], ["41 a 50", 10], ["Mayor de 50", 12],
     ["Motivo", 26], ["Atractivos", 40], ["Servicios", 40],
+    // Columna S: el mes como número AAAAMM. Existe para que el selector del
+    // tablero pueda comparar sin depender del texto ni del idioma de Excel.
+    ["MesNum", 10],
   ];
   ws.columns = cols.map(c => ({ width: c[1] }));
   cols.forEach((c, i) => {
@@ -560,6 +614,7 @@ function hojaDatos(wb, records) {
       r.femenino||0, r.masculino||0, r.total||0,
       r.edad_menor18||0, r.edad_18_29||0, r.edad_30_40||0, r.edad_41_50||0, r.edad_mayor50||0,
       r.motivo||"", (r.atractivos||[]).join(" · "), (r.servicios||[]).join(" · "),
+      mesNumero(r.fecha),
     ];
     fila.forEach((v, j) => {
       const c = ws.getCell(f, j+1);

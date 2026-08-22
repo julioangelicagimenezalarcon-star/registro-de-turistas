@@ -1672,6 +1672,13 @@
     const M = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     return `${d} de ${M[m-1]} de ${a}`;
   }
+  // "2026-12-21" -> "21 dic". Las fechas ISO completas en el eje X salían
+  // pegadas unas con otras y se leían como un solo número largo.
+  function fechaCorta(iso){
+    const M = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const [a,m,d] = String(iso||"").split("-").map(Number);
+    return (m && d) ? `${d} ${M[m-1]}` : String(iso||"");
+  }
   const esc = (s) => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
   // Convierte el texto narrado (con saltos de línea) en párrafos.
@@ -1836,12 +1843,16 @@
     const flujo = [...(a.porFecha||[])].sort((x,y)=> x[0]<y[0]?-1:1);
     mk("inf-ch-flujo", {
       type:"line",
-      data:{ labels: flujo.map(f=>f[0]), datasets:[{ data: flujo.map(f=>f[1]),
+      // Etiqueta corta en el eje; la fecha completa queda en el tooltip.
+      data:{ labels: flujo.map(f=>fechaCorta(f[0])), datasets:[{ data: flujo.map(f=>f[1]),
         borderColor: INF.mar, backgroundColor:"rgba(23,101,94,0.12)",
         fill:true, tension:0.3, pointRadius:0, borderWidth:2 }] },
       options:{ ...base,
-        scales:{ x:{ ...ejeXlimpio, ticks:{ maxTicksLimit:6, maxRotation:0 } }, y:ejeY },
-        plugins:{ ...base.plugins, title:{ display:true, text:"Flujo diario de turistas", font:{size:13,weight:"600"} } } }
+        scales:{ x:{ ...ejeXlimpio,
+          ticks:{ maxTicksLimit:5, maxRotation:0, autoSkip:true, padding:4, font:{size:10} } }, y:ejeY },
+        plugins:{ ...base.plugins,
+          tooltip:{ callbacks:{ title:(it)=> flujo[it[0].dataIndex] ? fechaLarga(flujo[it[0].dataIndex][0]) : "" } },
+          title:{ display:true, text:"Flujo diario de turistas", font:{size:13,weight:"600"} } } }
     });
 
     // 2. Día de la semana — el peak en dorado

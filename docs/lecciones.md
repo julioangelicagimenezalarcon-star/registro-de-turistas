@@ -68,3 +68,62 @@ tocar código: es barato y evita repetir lo que ya costó caro.
 - **Regla para no repetirlo:** todo .xlsx con fórmulas se entrega recalculado.
   El script busca `soffice` en el PATH; en este equipo hay que anteponer
   `/Applications/LibreOffice.app/Contents/MacOS`.
+
+---
+
+## 2026-08-21 — El tablero mostraba ceros y no decía por qué
+
+- **Qué pasó:** Julio cambió el período en el Dashboard y todas las cifras
+  quedaron en 0. La casilla mostraba `01/12/26`.
+- **Causa raíz:** dos capas. (1) El selector comparaba **texto** (`$C$5`) contra
+  la columna Mes, que guarda "Diciembre 2026"; al escribir una fecha, Excel la
+  guarda como número y ninguna comparación calza. (2) Peor: **LibreOffice
+  interpretó `01/12/26` como enero de 2026**, un mes sin registros — así que
+  aunque la comparación hubiera funcionado, el resultado real era 0. El tablero
+  no tenía forma de decirlo.
+- **Cómo se corrigió:** se agregó la columna `MesNum` (AAAAMM numérico) a la hoja
+  Datos y una celda oculta `I5` que normaliza lo que haya en el selector: 0 =
+  toda la temporada, AAAAMM si es texto conocido **o si es una fecha**, -1 si no
+  se reconoce. Todas las fórmulas comparan contra ese número. Y se agregó un
+  aviso en rojo (`B6`) que distingue los dos casos: "ese período no existe" y
+  "se entendió el mes AAAA-MM, que no tiene registros".
+- **Regla para no repetirlo:** **una cifra en cero tiene que poder explicarse
+  sola.** Si un tablero filtra por algo que el usuario escribe, validar la
+  entrada y decir en pantalla por qué no hay datos — el cero mudo se lee como
+  "no vino nadie", que es una conclusión falsa. Y nunca comparar contra texto lo
+  que Excel puede convertir en fecha: comparar contra un número.
+
+---
+
+## 2026-08-21 — Revertir un commit reintrodujo un defecto de layout
+
+- **Qué pasó:** al volver `informe.js` a la versión previa por pedido de Julio,
+  las etiquetas del Dashboard ("Lunes", "Martes"...) volvieron a caer en la
+  columna A, que mide 3 de ancho, y salían cortadas.
+- **Causa raíz:** el commit revertido no solo traía estilos: también había
+  corregido ese desfase moviendo las tablas a la columna B. Revertir "lo
+  estético" se llevó puesta una corrección funcional.
+- **Cómo se corrigió:** `tituloSeccion` y `encabezadoTabla` recibieron un
+  parámetro `desdeCol` (por defecto 1, para no alterar la hoja Análisis, donde
+  la columna A mide 34) y el Dashboard lo usa con 2.
+- **Regla para no repetirlo:** antes de revertir un commit, **listar qué
+  arreglos funcionales viajaron dentro de él** y reaplicarlos. Un commit
+  titulado "estilos" casi nunca trae solo estilos.
+
+---
+
+## 2026-08-21 — El verificador borró la hoja de datos y todo salió #NAME?
+
+- **Qué pasó:** para mirar solo el Dashboard, una macro borró las otras hojas.
+  El render salió con `#NAME?` en cada fórmula y parecía que el archivo estaba
+  roto.
+- **Causa raíz:** todas las fórmulas del tablero referencian `Datos!`. Al borrar
+  esa hoja, quedaron sin destino. El archivo estaba perfecto; lo rompió la
+  prueba.
+- **Cómo se corrigió:** la macro ahora **oculta** las hojas (`IsVisible = False`)
+  en vez de borrarlas. LibreOffice imprime solo las visibles, que era lo único
+  que se necesitaba.
+- **Regla para no repetirlo:** al aislar una parte de un archivo para revisarla,
+  **ocultar, no eliminar** — y si el resultado se ve peor de lo esperado,
+  sospechar del método de aislamiento antes que del archivo. Es la tercera vez
+  en el mismo día que el verificador miente (ver la del fondo negro).
