@@ -241,26 +241,33 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
   Se agregó `overrides.uuid` en `package.json` porque ExcelJS arrastra un uuid
   con una vulnerabilidad moderada que `npm audit fix` no resolvía solo.
 
-  **(2026-08-21, segunda pasada) Profundidad visual.** Julio pidió nivel de
-  gerencia general: relieve, tridimensionalidad. En Excel las celdas no tienen
-  sombra ni elevación, así que se consigue combinando tres recursos que sí son
-  nativos: **degradados de relleno** (`fill: {type:"gradient"}`), **bordes
-  asimétricos** —claro arriba/izquierda, oscuro abajo/derecha, que es como el
-  ojo lee una superficie elevada— y una **fila delgada de gris bajo cada
-  bloque** que funciona como sombra proyectada (`sombra()`).
+  **(2026-08-21, segunda pasada) Se probó agregar profundidad visual y se
+  revirtió.** Julio pidió relieve y tridimensionalidad "nivel gerencia general".
+  En Excel las celdas no tienen sombra ni elevación, así que se simuló con
+  degradados de relleno, bordes asimétricos y una fila de gris bajo cada bloque.
+  Funcionaba, pero al decidir que el informe de presentación viviera en la web
+  (pestaña Informe, HTML) **el Excel volvió a su rol de planilla de trabajo** y
+  esa capa se quitó por pedido de Julio: `git checkout 3083b1d -- informe.js`.
+  Si alguna vez se quiere recuperar, está entera en el commit `48e23a1`.
 
-  Las cifras de portada son tarjetas de cuatro filas (`tarjetaKPI()`): banda de
-  acento, título, valor y sombra, cada una con su color. El selector del tablero
-  usa el mismo relieve para leerse como un botón.
+  Dos aprendizajes de esa pasada que siguen vigentes:
 
-  **Verificado con `recalc.py` de la habilidad `xlsx`: 0 errores en 79
-  fórmulas.** El script busca `soffice` en el PATH; en este equipo hay que
-  anteponer `/Applications/LibreOffice.app/Contents/MacOS`.
+  **Verificar las fórmulas con `recalc.py`** (habilidad `xlsx`): recalcula el
+  archivo con LibreOffice y reporta errores reales, no solo que la fórmula esté
+  escrita. Estado actual: 0 errores en 80 fórmulas. El script busca `soffice` en
+  el PATH; en este equipo hay que anteponer
+  `/Applications/LibreOffice.app/Contents/MacOS`.
 
-  Cuidado con el alto de las filas de texto: se calcula estimando caracteres por
-  línea, y si se subestima **Excel corta el último renglón sin avisar**. Pasó
-  con `/108`; el ancho real da unos 88 caracteres. Esto no se ve en el código:
-  hay que convertir el archivo a PDF y mirarlo.
+  **El alto de las filas de texto se estima por caracteres por línea, y si se
+  subestima Excel corta el último renglón sin avisar.** No se ve en el código:
+  hay que convertir a PDF y mirarlo. En el layout actual el texto se mergea sobre
+  112 unidades de ancho y el divisor es `/100`, que sobreestima líneas — queda
+  del lado seguro. Verificado visualmente.
+
+  Y una trampa del propio método de verificación: al rasterizar ese PDF con
+  `sips` a PNG el fondo sale **negro**, y el texto oscuro parece ilegible. Es del
+  conversor, no del archivo. Convertir a **JPEG** (sin canal alfa) o leer los
+  colores con openpyxl antes de dar por malo el resultado.
 
 - **(2026-08-21) El Historial se agrupa por mes y día**, pedido de Julio: la
   lista corrida era imposible de recorrer con una temporada completa encima, y
