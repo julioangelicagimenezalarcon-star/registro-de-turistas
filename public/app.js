@@ -749,7 +749,10 @@
   if(hasChart){
     Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
     Chart.defaults.color = "#22201B";
-    Chart.defaults.animation = { duration: 850, easing: "easeOutQuart" };
+    // 850ms era casi tres veces el presupuesto de una animación de interfaz
+    // (300ms), multiplicado por los ocho gráficos del Panel. La primera vez
+    // impresiona; a la décima estorba.
+    Chart.defaults.animation = { duration: 300, easing: "easeOutQuart" };
   } else {
     console.error("[Registro de Turistas] Chart.js no cargó (CDN). Los gráficos del Panel no se mostrarán, pero el resto de la app funciona con normalidad.");
   }
@@ -1427,7 +1430,7 @@
     const cuerpo = grupo.querySelector(".dia-cuerpo");
     if(!cuerpo.dataset.pintado){
       const regs = (historialPorMes[fecha.slice(0,7)] || {})[fecha] || [];
-      cuerpo.innerHTML = regs.map(tarjetaRegistro).join("");
+      cuerpo.innerHTML = `<div class="acordeon-int">${regs.map(tarjetaRegistro).join("")}</div>`;
       cuerpo.dataset.pintado = "1";
       engancharBorrado(cuerpo);
     }
@@ -1445,7 +1448,9 @@
     const cuerpo = grupo.querySelector(".mes-cuerpo");
     if(!cuerpo.dataset.pintado){
       const dias = Object.keys(historialPorMes[ym] || {}).sort().reverse();
-      cuerpo.innerHTML = dias.map(f=>`
+      // El envoltorio existe para animar el despliegue: la fila de grid pasa de
+      // 0fr a 1fr y este div recorta lo que sobra mientras crece.
+      cuerpo.innerHTML = `<div class="acordeon-int">` + dias.map(f=>`
         <div class="dia-grupo" data-fecha="${escapeAttr(f)}">
           <button type="button" class="dia-cabecera">
             <span class="dia-flecha" aria-hidden="true">▸</span>
@@ -1453,7 +1458,7 @@
             <span class="dia-conteo">${resumen(historialPorMes[ym][f])}</span>
           </button>
           <div class="dia-cuerpo"></div>
-        </div>`).join("");
+        </div>`).join("") + `</div>`;
       cuerpo.dataset.pintado = "1";
       cuerpo.querySelectorAll(".dia-grupo").forEach(g=>{
         g.querySelector(".dia-cabecera").addEventListener("click", ()=>{

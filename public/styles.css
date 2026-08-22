@@ -38,6 +38,17 @@
     --muted:#6B6558;
     --line: rgba(20,21,14,0.14);
     --ok:#3D7317;
+
+    /* --- Movimiento ---
+       Las curvas propias de CSS (ease, ease-out) son demasiado débiles para un
+       movimiento deliberado. Estas son curvas fuertes, y viven acá como fichas
+       para que no vuelvan a aparecer siete duraciones escritas a mano.
+       Presupuesto: nada de interfaz pasa de 300ms. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --dur-press: 120ms;   /* respuesta al dedo */
+    --dur-fast: 160ms;    /* hover, flechas, cambios de color */
+    --dur-base: 220ms;    /* despliegues y entradas */
     --warn:#A63D2F;
   }
   *{box-sizing:border-box;}
@@ -151,7 +162,9 @@
     /* Negro: en este tramo el fondo es verde claro. El mostaza aquí daría 1,5. */
     color: var(--ink);
     margin:0 0 6px;
-    letter-spacing: 0.2px;
+    /* El tracking depende del tamaño: a 2,5rem las letras ya se leen separadas
+       y hay que apretarlas. Un valor positivo acá desarma la palabra. */
+    letter-spacing: -0.02em;
   }
   .masthead .title-block p{
     margin:0;
@@ -187,10 +200,22 @@
 
   /* tabs */
   .tabs{
+    /* Material translúcido: el contenido pasa por debajo en vez de chocar con
+       una franja opaca. Se conserva el tono oscuro original —esto flota sobre
+       el verde de la app— y lo que se agrega es el material y la profundidad.
+       Al quedar pegada arriba se cambia de sección sin volver a subir. */
+    position: sticky;
+    top: 8px;
+    z-index: 30;
     display:flex;
     gap:6px;
     margin-bottom: 22px;
-    background: rgba(20,21,14,0.14);
+    background: rgba(20,21,14,0.22);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    /* Borde superior claro: es la luz pegando en el canto del material. */
+    border-top: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 6px 18px rgba(20,21,14,0.16);
     padding: 5px;
     border-radius: 12px;
     width: fit-content;
@@ -205,9 +230,13 @@
     padding: 9px 16px;
     border-radius: 8px;
     cursor:pointer;
-    transition: all .15s ease;
+    /* Propiedades explícitas: 'all' anima cosas que nadie pidió y lo hace
+       fuera de la tarjeta gráfica. */
+    transition: color var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                transform var(--dur-press) var(--ease-out);
   }
-  .tab-btn:hover{ color: var(--ink); }
   .tab-btn.active{
     background: var(--gold);
     color: var(--ink);
@@ -287,10 +316,12 @@
     font-size: 0.82rem;
     cursor: pointer;
     user-select:none;
-    transition: all .12s ease;
+    transition: border-color var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                transform var(--dur-press) var(--ease-out);
     color: var(--charcoal);
   }
-  .chip:hover{ border-color: var(--cobq-verde-700); }
   .chip.selected{
     background: var(--cobq-verde-700);
     border-color: var(--cobq-verde-700);
@@ -310,7 +341,6 @@
     font-size:0.82rem;
     white-space:nowrap;
   }
-  .chip-add button:hover{ border-color: var(--ink-2); color: var(--ink-2); }
 
   /* dropdown multi-select (atractivos turísticos) */
   .dropdown-multiselect{ position:relative; margin-bottom:10px; }
@@ -331,7 +361,6 @@
     cursor:pointer;
   }
   .dropdown-toggle::after{ content:"▾"; color:var(--muted); flex:none; }
-  .dropdown-toggle:hover{ border-color:var(--cobq-verde-700); }
   .dropdown-multiselect.open .dropdown-toggle{
     border-color:var(--cobq-verde-700);
     box-shadow: 0 0 0 3px rgba(61,115,23,0.15);
@@ -365,7 +394,6 @@
     color:var(--charcoal);
     margin-bottom:0;
   }
-  .dropdown-option:hover{ background:var(--paper-2); }
   .dropdown-option input[type="checkbox"]{
     width:16px; height:16px;
     accent-color:var(--cobq-verde-700);
@@ -381,7 +409,7 @@
 
   /* stamp button */
   .stamp-row{ display:flex; justify-content:flex-end; align-items:center; gap:14px; margin-top: 8px; }
-  .stamp-msg{ font-size:0.82rem; color: var(--ok); font-weight:600; opacity:0; transition: opacity .3s ease; }
+  .stamp-msg{ font-size:0.82rem; color: var(--ok); font-weight:600; opacity:0; transition: opacity var(--dur-base) var(--ease-out); }
   .stamp-msg.show{ opacity:1; }
   .stamp-btn{
     border: 2.5px solid var(--stamp);
@@ -396,9 +424,10 @@
     border-radius: 8px;
     cursor:pointer;
     transform: rotate(-1.5deg);
-    transition: transform .12s ease, background .12s ease, color .12s ease;
+    transition: transform var(--dur-press) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
   }
-  .stamp-btn:hover{ background: var(--stamp); color:#fff; }
   .stamp-btn.stamped{ animation: stampit .32s ease; }
   @keyframes stampit{
     0%{ transform: rotate(-1.5deg) scale(1); }
@@ -446,7 +475,7 @@
     min-width: 0;
     overflow:hidden;
     box-shadow: 0 2px 10px rgba(20,21,14,0.05);
-    transition: transform .18s ease, box-shadow .18s ease;
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
   .stat-card::before{
     content:"";
@@ -455,10 +484,6 @@
     height:3px;
     background: linear-gradient(90deg, var(--cobq-verde-700), var(--cobq-verde-600), var(--cobq-verde));
     opacity:0.85;
-  }
-  .stat-card:hover{
-    transform: translateY(-2px);
-    box-shadow: 0 10px 22px rgba(20,21,14,0.1);
   }
   .stat-card .icon{
     width:30px; height:30px;
@@ -604,7 +629,6 @@
     border:none; background:transparent; color: var(--muted); cursor:pointer;
     font-size:0.78rem; text-decoration:underline; padding:4px;
   }
-  .del-btn:hover{ color: var(--stamp); }
 
   .toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
   .toolbar-btn{
@@ -616,7 +640,6 @@
     cursor:pointer;
     color: var(--charcoal);
   }
-  .toolbar-btn:hover{ border-color: var(--ink-2); }
 
   .shared-note{
     font-size: 0.76rem;
@@ -638,9 +661,8 @@
     padding: 18px 20px 10px;
     min-width: 0;
     box-shadow: 0 2px 10px rgba(20,21,14,0.04);
-    transition: box-shadow .18s ease, transform .18s ease;
+    transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
   }
-  .chart-card:hover{ box-shadow: 0 10px 24px rgba(20,21,14,0.09); }
   .chart-card.wide{ grid-column: 1 / -1; }
   .chart-card .rank-badge{
     position:absolute;
@@ -763,14 +785,13 @@
     cursor: pointer;
     text-align: left;
     font-family: 'IBM Plex Sans', sans-serif;
-    transition: background .14s ease;
+    transition: background var(--dur-fast) var(--ease-out);
   }
-  .mes-cabecera:hover{ background: rgba(61,115,23,0.07); }
   .mes-flecha{
     color: var(--cobq-verde-700);
     font-size: 1rem;
     flex: none;
-    transition: transform .16s ease;
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   .mes-grupo.abierto .mes-flecha{ transform: rotate(90deg); }
   .mes-nombre{
@@ -788,8 +809,18 @@
     flex: none;
     white-space: nowrap;
   }
-  .mes-cuerpo{ display: none; padding: 0 10px 10px; }
-  .mes-grupo.abierto .mes-cuerpo{ display: block; }
+  /* El despliegue se anima con filas de grid (0fr -> 1fr): es la única forma
+     de crecer hasta "lo que mida el contenido" sin medirlo con JavaScript, y
+     sin animar la altura, que obliga al navegador a recalcular el diseño en
+     cada cuadro. Antes era display:none, que no se puede animar. */
+  .mes-cuerpo{
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-base) var(--ease-out);
+  }
+  .mes-grupo.abierto .mes-cuerpo{ grid-template-rows: 1fr; }
+  .mes-cuerpo > .acordeon-int{ overflow: hidden; min-height: 0; padding: 0 10px; }
+  .mes-grupo.abierto .mes-cuerpo > .acordeon-int{ padding-bottom: 10px; }
   @media (max-width: 560px){
     .mes-cabecera{ flex-wrap: wrap; gap: 4px 10px; }
     .mes-nombre{ flex: 1 1 auto; }
@@ -815,14 +846,13 @@
     cursor: pointer;
     text-align: left;
     font-family: 'IBM Plex Sans', sans-serif;
-    transition: background .14s ease;
+    transition: background var(--dur-fast) var(--ease-out);
   }
-  .dia-cabecera:hover{ background: var(--paper-2); }
   .dia-flecha{
     color: var(--cobq-verde-700);
     font-size: 0.9rem;
     flex: none;
-    transition: transform .16s ease;
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   .dia-grupo.abierto .dia-flecha{ transform: rotate(90deg); }
   .dia-fecha{
@@ -839,8 +869,14 @@
     flex: none;
     white-space: nowrap;
   }
-  .dia-cuerpo{ display: none; padding: 0 12px 12px; }
-  .dia-grupo.abierto .dia-cuerpo{ display: block; }
+  .dia-cuerpo{
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-base) var(--ease-out);
+  }
+  .dia-grupo.abierto .dia-cuerpo{ grid-template-rows: 1fr; }
+  .dia-cuerpo > .acordeon-int{ overflow: hidden; min-height: 0; padding: 0 12px; }
+  .dia-grupo.abierto .dia-cuerpo > .acordeon-int{ padding-bottom: 12px; }
   @media (max-width: 560px){
     /* La flecha se queda junto a la fecha; lo que baja de línea es el conteo. */
     .dia-cabecera{ flex-wrap: wrap; gap: 4px 10px; }
@@ -921,14 +957,13 @@
     color: var(--muted);
     padding: 5px 15px;
     cursor:pointer;
-    transition: background .15s ease, color .15s ease;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
   }
   .viewtabs button.active{ background: var(--cobq-verde-700); color:#fff; }
   /* En terreno esto se toca con el dedo: en pantalla chica el botón crece. */
   @media (max-width: 720px){
     .viewtabs button{ padding: 9px 18px; font-size: 0.76rem; }
   }
-  .viewtabs button:not(.active):hover{ background: rgba(61,115,23,0.07); color: var(--ink); }
   .chart-box.flujo{ height: 260px; }
 
   .legend-total{
@@ -976,7 +1011,7 @@
   margin:0 0 6px; font-size:.78rem; letter-spacing:.09em; text-transform:uppercase;
   color:var(--cobq-verde); font-weight:700;
 }
-.inf-portada h1{ margin:0; font-size:1.95rem; line-height:1.15; font-weight:700; }
+.inf-portada h1{ margin:0; font-size:1.95rem; line-height:1.15; font-weight:700; letter-spacing:-0.015em; }
 .inf-periodo{ margin:8px 0 0; font-size:.95rem; opacity:.9; }
 .inf-emitido{ margin:0; font-size:.78rem; opacity:.72; white-space:nowrap; }
 
@@ -1129,3 +1164,106 @@
   .inf-portada h1{ font-size:20pt; }
   .inf-kpi .k-v{ font-size:16pt; }
 }
+
+/* ===================== HOVER SOLO CON MOUSE =====================
+   En una pantalla táctil no existe "pasar por encima": el navegador dispara el
+   hover al tocar y lo deja PEGADO hasta que toques otra cosa. En terreno eso se
+   veía como el botón de sellar quedándose rojo después de registrar, que parece
+   un error. Estas reglas solo aplican donde hay un puntero de verdad. */
+@media (hover: hover) and (pointer: fine){
+  .tab-btn:hover{ color: var(--ink); }
+  .chip:hover{ border-color: var(--cobq-verde-700); }
+  .chip-add button:hover{ border-color: var(--ink-2); color: var(--ink-2); }
+  .dropdown-toggle:hover{ border-color:var(--cobq-verde-700); }
+  .dropdown-option:hover{ background:var(--paper-2); }
+  .stamp-btn:hover{ background: var(--stamp); color:#fff; }
+  .stat-card:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(20,21,14,0.1);
+    }
+  .del-btn:hover{ color: var(--stamp); }
+  .toolbar-btn:hover{ border-color: var(--ink-2); }
+  .chart-card:hover{ box-shadow: 0 10px 24px rgba(20,21,14,0.09); }
+  .mes-cabecera:hover{ background: rgba(61,115,23,0.07); }
+  .dia-cabecera:hover{ background: var(--paper-2); }
+  .viewtabs button:not(.active):hover{ background: rgba(61,115,23,0.07); color: var(--ink); }
+}
+
+/* ===================== RESPUESTA AL DEDO =====================
+   El principio: la interfaz acusa recibo EN LA PRESIÓN, no al soltar. Sin esto
+   el informador toca y la pantalla no responde hasta que la acción termina, y
+   la app se siente muerta. El hundido es sutil a propósito (0,97). */
+.tab-btn:active,
+.chip:active,
+.toolbar-btn:active,
+.chip-add button:active,
+.dropdown-toggle:active,
+.viewtabs button:active,
+.del-btn:active{
+  transform: scale(0.97);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+/* El botón de sellar ya viene rotado: se le conserva el ángulo. */
+.stamp-btn:active{
+  transform: rotate(-1.5deg) scale(0.97);
+  transition: transform var(--dur-press) var(--ease-out);
+}
+/* Las cabeceras del historial ocupan todo el ancho: encogerlas se vería raro.
+   Acusan recibo oscureciendo el fondo. */
+.mes-cabecera:active{ background: rgba(61,115,23,0.12); }
+.dia-cabecera:active{ background: var(--paper-2); }
+
+/* ===================== ACCESIBILIDAD DEL MOVIMIENTO =====================
+   "Reducir movimiento" no significa quitar toda respuesta: significa conservar
+   lo que ayuda a entender (color, opacidad) y sacar lo que desplaza cosas.
+   El feedback al presionar se mantiene — es información, no adorno. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  /* Se conservan color y opacidad; se anula el desplazamiento. */
+  .stat-card:hover{ transform:none; }
+  .mes-grupo.abierto .mes-flecha,
+  .dia-grupo.abierto .dia-flecha{ transition:none; }
+  .mes-cuerpo, .dia-cuerpo{ transition:none; }
+  .stamp-btn.stamped{ animation:none; }
+  .tab-btn:active, .chip:active, .toolbar-btn:active, .chip-add button:active,
+  .dropdown-toggle:active, .viewtabs button:active, .del-btn:active,
+  .stamp-btn:active{ transform:none; opacity:0.75; }
+}
+
+/* Si el sistema pide menos transparencia, la barra de pestañas se vuelve sólida. */
+@media (prefers-reduced-transparency: reduce){
+  .tabs{ background: var(--ink-2); backdrop-filter:none; }
+}
+
+/* ===================== ENTRADA DEL INFORME =====================
+   El Informe es pantalla de presentación y se abre pocas veces: acá el adorno
+   sí se justifica. El escalonado es de 45ms — lo suficiente para que el ojo lea
+   un orden, no tanto como para hacer esperar. Nunca bloquea la interacción:
+   el contenido ya está ahí y se puede tocar desde el primer cuadro. */
+@keyframes inf-entra{
+  from{ opacity:0; transform: translateY(8px); }
+  to{ opacity:1; transform:none; }
+}
+.informe-doc > *{
+  animation: inf-entra var(--dur-base) var(--ease-out) both;
+}
+.informe-doc > *:nth-child(1){ animation-delay: 0ms; }
+.informe-doc > *:nth-child(2){ animation-delay: 45ms; }
+.informe-doc > *:nth-child(3){ animation-delay: 90ms; }
+.informe-doc > *:nth-child(4){ animation-delay: 135ms; }
+.informe-doc > *:nth-child(5){ animation-delay: 180ms; }
+.informe-doc > *:nth-child(n+6){ animation-delay: 225ms; }
+
+@media (prefers-reduced-motion: reduce){
+  .informe-doc > *{ animation: none; }
+}
+/* En impresión el documento aparece entero: una animación a medio correr se
+   congelaría en el PDF. */
+@media print{
+  .informe-doc > *{ animation: none !important; opacity:1 !important; transform:none !important; }
+}
+

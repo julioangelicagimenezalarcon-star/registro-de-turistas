@@ -170,3 +170,21 @@ tocar código: es barato y evita repetir lo que ya costó caro.
   papel más chico y los márgenes más grandes que el usuario pueda tener. Mirar
   una miniatura del PDF no es verificar.
 
+---
+
+## 2026-08-22 — Una propiedad repetida dentro de la misma regla CSS
+
+- **Qué pasó:** al hacer translúcida la barra de pestañas, el fondo nuevo no
+  aparecía. El CSS decía lo correcto.
+- **Causa raíz:** la regla `.tabs` ya tenía un `background` **más abajo dentro
+  del mismo bloque**, y en CSS gana el último. Se veía bien leyendo el archivo
+  de arriba hacia abajo porque las dos declaraciones estaban a 10 líneas de
+  distancia.
+- **Cómo se corrigió:** se detectó leyendo el **valor computado** en el
+  navegador (`getComputedStyle`), no el archivo, y se reescribió la regla
+  completa en vez de insertar líneas sueltas.
+- **Regla para no repetirlo:** después de tocar CSS, comprobar el **valor
+  computado en el navegador**, no que la línea esté escrita. Y al agregar una
+  propiedad a una regla existente, leer el bloque entero primero: puede estar ya
+  declarada más abajo.
+
