@@ -32,6 +32,8 @@ const C = {
   gris: "FF6B6558",
   linea: "FFD8D2C4",
   mar: "FF17655E",
+  sombra: "FFC9C3B4",     // fila delgada bajo cada bloque: hace de sombra
+  destacado: "FFEAF6DC",  // fondo de la fila #1 de cada ranking
 };
 
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -231,69 +233,141 @@ function concluir(a) {
 
 // ---------------------------------------------------------------------------
 // Construcción del archivo
+//
+// La profundidad en Excel no se logra con sombras (no existen para celdas): se
+// logra con tres recursos que sí son nativos y que aquí se usan juntos —
+// degradados de relleno, bordes asimétricos (claro arriba/izquierda, oscuro
+// abajo/derecha) y una fila delgada de gris bajo cada bloque que el ojo lee
+// como sombra proyectada.
 // ---------------------------------------------------------------------------
 function borde(color = C.linea, style = "thin") {
   return { top:{style,color:{argb:color}}, left:{style,color:{argb:color}},
            bottom:{style,color:{argb:color}}, right:{style,color:{argb:color}} };
 }
 
-function tituloSeccion(ws, fila, texto, ancho = 6) {
-  ws.mergeCells(fila, 1, fila, ancho);
-  const c = ws.getCell(fila, 1);
+/** Bordes que simulan una superficie elevada: luz arriba, sombra abajo. */
+function relieve(claro = C.blanco, oscuro = C.linea) {
+  return {
+    top:    { style:"thin",   color:{argb:claro} },
+    left:   { style:"thin",   color:{argb:claro} },
+    bottom: { style:"medium", color:{argb:oscuro} },
+    right:  { style:"medium", color:{argb:oscuro} },
+  };
+}
+
+function degradado(desde, hasta, vertical = true) {
+  return {
+    type:"gradient", gradient:"angle", degree: vertical ? 90 : 0,
+    stops:[{position:0,color:{argb:desde}},{position:1,color:{argb:hasta}}],
+  };
+}
+
+/** Fila delgada que hace de sombra bajo un bloque. */
+function sombra(ws, fila, desdeCol, hastaCol, alto = 3.5) {
+  for (let c = desdeCol; c <= hastaCol; c++) {
+    ws.getCell(fila, c).fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.sombra} };
+  }
+  ws.getRow(fila).height = alto;
+}
+
+function tituloSeccion(ws, fila, texto, desdeCol = 1, hastaCol = 4) {
+  ws.mergeCells(fila, desdeCol, fila, hastaCol);
+  const c = ws.getCell(fila, desdeCol);
   c.value = texto;
-  c.font = { name:"Calibri", size:12, bold:true, color:{argb:C.blanco} };
-  c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde700} };
+  c.font = { name:"Calibri", size:11.5, bold:true, color:{argb:C.blanco} };
+  c.fill = degradado(C.verde800, C.verde600);
   c.alignment = { vertical:"middle", indent:1 };
-  ws.getRow(fila).height = 22;
-  return fila + 1;
+  c.border = relieve(C.verde600, C.tinta);
+  ws.getRow(fila).height = 24;
+  sombra(ws, fila+1, desdeCol, hastaCol, 2.5);
+  return fila + 2;
 }
 
-function encabezadoTabla(ws, fila, cols) {
+function encabezadoTabla(ws, fila, cols, desdeCol = 1) {
   cols.forEach((t, i) => {
-    const c = ws.getCell(fila, i+1);
+    const c = ws.getCell(fila, desdeCol + i);
     c.value = t;
-    c.font = { name:"Calibri", size:10, bold:true, color:{argb:C.blanco} };
-    c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde800} };
+    c.font = { name:"Calibri", size:9.5, bold:true, color:{argb:C.blanco} };
+    c.fill = degradado(C.tinta, C.verde800);
     c.alignment = { vertical:"middle", horizontal: i===0 ? "left" : "center", indent: i===0 ? 1 : 0 };
-    c.border = borde(C.verde800);
+    c.border = { top:{style:"thin",color:{argb:C.verde600}}, bottom:{style:"medium",color:{argb:C.tinta}},
+                 left:{style:"thin",color:{argb:C.verde800}}, right:{style:"thin",color:{argb:C.verde800}} };
   });
-  ws.getRow(fila).height = 18;
+  ws.getRow(fila).height = 20;
   return fila + 1;
 }
 
-/** Tabla de ranking con % y barra de datos. Devuelve la fila siguiente. */
+/** Tarjeta elevada con una cifra. Ocupa 4 filas desde `fila`. */
+function tarjetaKPI(ws, fila, col, titulo, valor, fmt, acento = C.verde) {
+  const cAcento = ws.getCell(fila, col);
+  cAcento.fill = degradado(acento, acento);
+  cAcento.border = { top:{style:"thin",color:{argb:acento}}, left:{style:"thin",color:{argb:acento}}, right:{style:"thin",color:{argb:acento}} };
+  ws.getRow(fila).height = 5;
+
+  const cTit = ws.getCell(fila+1, col);
+  cTit.value = titulo;
+  cTit.font = { name:"Calibri", size:8.5, bold:true, color:{argb:C.verde700} };
+  cTit.alignment = { horizontal:"center", vertical:"bottom" };
+  cTit.fill = degradado(C.blanco, C.papel);
+  cTit.border = { left:{style:"thin",color:{argb:C.blanco}}, right:{style:"medium",color:{argb:C.linea}} };
+  ws.getRow(fila+1).height = 15;
+
+  const cVal = ws.getCell(fila+2, col);
+  if (typeof valor === "object" && valor.formula) cVal.value = valor;
+  else cVal.value = valor;
+  if (fmt) cVal.numFmt = fmt;
+  cVal.font = { name:"Calibri", size:22, bold:true, color:{argb:C.tinta} };
+  cVal.alignment = { horizontal:"center", vertical:"top" };
+  cVal.fill = degradado(C.papel, C.papel2);
+  cVal.border = { left:{style:"thin",color:{argb:C.blanco}}, right:{style:"medium",color:{argb:C.linea}}, bottom:{style:"medium",color:{argb:C.linea}} };
+  ws.getRow(fila+2).height = 30;
+
+  ws.getCell(fila+3, col).fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.sombra} };
+  ws.getRow(fila+3).height = 3;
+}
+
+/** Tabla de ranking con % y barra de datos. */
 function tablaRanking(ws, fila, titulo, entradas, denom, etiquetaDenom, limite = 12) {
-  fila = tituloSeccion(ws, fila, titulo, 4);
+  fila = tituloSeccion(ws, fila, titulo, 1, 4);
   fila = encabezadoTabla(ws, fila, ["Categoría", "Cantidad", "% " + etiquetaDenom, "Peso relativo"]);
   const desde = fila;
   const lista = entradas.slice(0, limite);
   lista.forEach((e, i) => {
+    const primero = i === 0;
     const par = i % 2 === 0;
     const celdas = [e[0], e[1], denom ? e[1]/denom : 0, e[1]];
     celdas.forEach((v, j) => {
       const c = ws.getCell(fila, j+1);
       c.value = v;
-      c.border = borde();
-      c.fill = { type:"pattern", pattern:"solid", fgColor:{argb: par ? C.blanco : C.papel} };
-      c.font = { name:"Calibri", size:10, color:{argb:C.tinta}, bold: i===0 };
-      if (j === 0) c.alignment = { indent:1 };
-      if (j === 1) { c.numFmt = "#,##0"; c.alignment = { horizontal:"center" }; }
-      if (j === 2) { c.numFmt = "0.0%"; c.alignment = { horizontal:"center" }; }
-      if (j === 3) c.font = { name:"Calibri", size:10, color:{argb: par ? C.blanco : C.papel} };
+      c.border = {
+        top:{style:"hair",color:{argb:C.blanco}},
+        bottom:{style:"hair",color:{argb:C.linea}},
+        left:{style:"hair",color:{argb:C.linea}},
+        right:{style:"hair",color:{argb:C.linea}},
+      };
+      c.fill = primero ? degradado(C.destacado, C.papel2)
+                       : { type:"pattern", pattern:"solid", fgColor:{argb: par ? C.blanco : C.papel} };
+      c.font = { name:"Calibri", size:10, color:{argb:C.tinta}, bold: primero };
+      if (j === 0) c.alignment = { indent:1, vertical:"middle" };
+      if (j === 1) { c.numFmt = "#,##0"; c.alignment = { horizontal:"center", vertical:"middle" }; }
+      if (j === 2) { c.numFmt = "0.0%"; c.alignment = { horizontal:"center", vertical:"middle" }; }
+      if (j === 3) c.font = { name:"Calibri", size:10, color:{argb: primero ? C.destacado : (par ? C.blanco : C.papel)} };
     });
+    ws.getRow(fila).height = 17;
     fila++;
   });
   if (lista.length) {
-    // La "barra" es formato condicional nativo: se recalcula sola si cambian los datos.
     ws.addConditionalFormatting({
       ref: `D${desde}:D${fila-1}`,
-      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde600}, gradient:false }],
+      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde600}, gradient:true }],
     });
   }
+  sombra(ws, fila, 1, 4, 3);
+  fila++;
   if (entradas.length > limite) {
     const c = ws.getCell(fila, 1);
     c.value = `Se muestran las ${limite} principales de ${entradas.length}. El detalle completo está en la hoja "Datos".`;
-    c.font = { name:"Calibri", size:9, italic:true, color:{argb:C.gris} };
+    c.font = { name:"Calibri", size:8.5, italic:true, color:{argb:C.gris} };
     ws.mergeCells(fila, 1, fila, 4);
     fila++;
   }
@@ -303,240 +377,243 @@ function tablaRanking(ws, fila, titulo, entradas, denom, etiquetaDenom, limite =
 function hojaResumen(wb, a, secciones, conclusion) {
   const ws = wb.addWorksheet("Resumen ejecutivo", {
     views: [{ showGridLines: false }],
-    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins:{left:0.5,right:0.5,top:0.6,bottom:0.6,header:0.3,footer:0.3} },
+    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+                 margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3} },
   });
-  ws.columns = [{width:3},{width:26},{width:18},{width:18},{width:18},{width:18},{width:14}];
+  ws.columns = [{width:2},{width:17},{width:1.6},{width:17},{width:1.6},{width:17},{width:1.6},{width:17},{width:2}];
 
-  // Portada
-  ws.mergeCells("B2:G4");
-  const t = ws.getCell("B2");
-  t.value = "Registro de Turistas";
-  t.font = { name:"Calibri", size:30, bold:true, color:{argb:C.blanco} };
-  t.alignment = { vertical:"middle", indent:1 };
-  for (let col = 2; col <= 7; col++) {
-    for (let f = 2; f <= 6; f++) {
-      ws.getCell(f, col).fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.tinta} };
+  // ---- Portada: degradado vertical de la arena negra al verde institucional
+  for (let f = 2; f <= 7; f++) {
+    for (let col = 2; col <= 8; col++) {
+      ws.getCell(f, col).fill = degradado(C.tinta, C.verde800);
     }
   }
-  ws.mergeCells("B5:G5");
+  ws.mergeCells("B2:H4");
+  const t = ws.getCell("B2");
+  t.value = "Registro de Turistas";
+  t.font = { name:"Calibri Light", size:32, bold:true, color:{argb:C.blanco} };
+  t.alignment = { vertical:"middle", indent:1 };
+  ws.getRow(2).height = 26; ws.getRow(3).height = 26; ws.getRow(4).height = 14;
+
+  ws.mergeCells("B5:H5");
   const st = ws.getCell("B5");
-  st.value = "I. Municipalidad de Cobquecura — La Costa de Ñuble";
-  st.font = { name:"Calibri", size:12, color:{argb:C.verde} };
+  st.value = "I. MUNICIPALIDAD DE COBQUECURA  ·  LA COSTA DE ÑUBLE";
+  st.font = { name:"Calibri", size:10, bold:true, color:{argb:C.verde} };
   st.alignment = { indent:1 };
-  ws.mergeCells("B6:G6");
+  ws.getRow(5).height = 18;
+
+  ws.mergeCells("B6:H6");
   const pe = ws.getCell("B6");
-  pe.value = a.desde ? `Informe del período ${fechaLarga(a.desde)} al ${fechaLarga(a.hasta)}` : "Informe de temporada";
-  pe.font = { name:"Calibri", size:10, color:{argb:C.papel2} };
-  pe.alignment = { indent:1 };
-  ws.getRow(2).height = 30; ws.getRow(3).height = 22; ws.getRow(4).height = 12;
-  ws.getRow(5).height = 20; ws.getRow(6).height = 20;
+  pe.value = a.desde ? `Informe del período  ${fechaLarga(a.desde)}  al  ${fechaLarga(a.hasta)}` : "Informe de temporada";
+  pe.font = { name:"Calibri", size:9.5, color:{argb:C.papel2} };
+  pe.alignment = { indent:1, vertical:"top" };
+  ws.getRow(6).height = 16;
+  ws.getRow(7).height = 6;
 
-  // Cifras principales
-  let fila = 8;
+  // Banda de acento bajo la portada + su sombra
+  for (let col = 2; col <= 8; col++) ws.getCell(8, col).fill = degradado(C.verde, C.mostaza, false);
+  ws.getRow(8).height = 5;
+  sombra(ws, 9, 2, 8, 4);
+
+  // ---- Cifras principales, en tarjetas elevadas
+  let fila = 11;
   const kpis = [
-    ["Turistas atendidos", a.turistas, "#,##0"],
-    ["Atenciones registradas", a.n, "#,##0"],
-    ["Grupo promedio", a.grupoMedio, "0.0"],
-    ["Días con actividad", a.diasConRegistro, "#,##0"],
+    ["TURISTAS ATENDIDOS", a.turistas, "#,##0", C.verde],
+    ["ATENCIONES", a.n, "#,##0", C.mar],
+    ["GRUPO PROMEDIO", a.grupoMedio, "0.0", C.mostaza],
+    ["DÍAS CON ACTIVIDAD", a.diasConRegistro, "#,##0", C.verde700],
   ];
-  kpis.forEach((k, i) => {
-    const col = 2 + i * (i < 4 ? 1 : 1);
-    const cTit = ws.getCell(fila, 2 + i);
-    cTit.value = k[0];
-    cTit.font = { name:"Calibri", size:9, bold:true, color:{argb:C.verde700} };
-    cTit.alignment = { horizontal:"center" };
-    cTit.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
-    cTit.border = { top:{style:"medium",color:{argb:C.verde}}, left:borde().left, right:borde().right };
-    const cVal = ws.getCell(fila+1, 2 + i);
-    cVal.value = k[1];
-    cVal.numFmt = k[2];
-    cVal.font = { name:"Calibri", size:20, bold:true, color:{argb:C.tinta} };
-    cVal.alignment = { horizontal:"center" };
-    cVal.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
-    cVal.border = { bottom:borde().bottom, left:borde().left, right:borde().right };
-  });
-  ws.getRow(fila).height = 16;
-  ws.getRow(fila+1).height = 30;
-  fila += 3;
+  kpis.forEach((k, i) => tarjetaKPI(ws, fila, 2 + i*2, k[0], k[1], k[2], k[3]));
+  fila += 5;
 
-  // Análisis narrativo
+  // ---- Análisis narrativo
   secciones.forEach(sec => {
-    ws.mergeCells(fila, 2, fila, 7);
+    ws.mergeCells(fila, 2, fila, 8);
     const h = ws.getCell(fila, 2);
-    h.value = sec.titulo;
-    h.font = { name:"Calibri", size:12, bold:true, color:{argb:C.verde800} };
-    h.border = { bottom:{style:"medium", color:{argb:C.verde}} };
-    ws.getRow(fila).height = 20;
-    fila++;
+    h.value = "   " + sec.titulo;
+    h.font = { name:"Calibri", size:12, bold:true, color:{argb:C.blanco} };
+    h.fill = degradado(C.verde800, C.verde600);
+    h.alignment = { vertical:"middle" };
+    h.border = relieve(C.verde600, C.tinta);
+    ws.getRow(fila).height = 22;
+    sombra(ws, fila+1, 2, 8, 2.5);
+    fila += 2;
 
-    ws.mergeCells(fila, 2, fila, 7);
+    ws.mergeCells(fila, 2, fila, 8);
     const p = ws.getCell(fila, 2);
     p.value = sec.texto;
     p.font = { name:"Calibri", size:10, color:{argb:C.tinta} };
-    p.alignment = { wrapText:true, vertical:"top" };
-    // Alto estimado: el ancho útil son ~100 caracteres por línea.
-    const lineas = sec.texto.split("\n").reduce((acc,l)=>acc + Math.max(1, Math.ceil(l.length/100)), 0);
-    ws.getRow(fila).height = Math.max(30, lineas * 13);
+    p.alignment = { wrapText:true, vertical:"top", indent:1 };
+    p.fill = degradado(C.blanco, C.papel);
+    p.border = { left:{style:"thick",color:{argb:C.verde}}, bottom:{style:"thin",color:{argb:C.linea}}, right:{style:"thin",color:{argb:C.linea}} };
+    // El ancho útil da unos 88 caracteres por línea. Subestimarlo corta el último
+    // renglón, y en Excel eso no se nota hasta abrir el archivo.
+    const lineas = sec.texto.split("\n").reduce((acc,l)=>acc + Math.max(1, Math.ceil(l.length/88)), 0);
+    ws.getRow(fila).height = Math.max(38, lineas * 14.5 + 8);
+    fila++;
+    sombra(ws, fila, 2, 8, 3);
     fila += 2;
   });
 
-  // Conclusión
-  ws.mergeCells(fila, 2, fila, 7);
+  // ---- Conclusión
+  ws.mergeCells(fila, 2, fila, 8);
   const ct = ws.getCell(fila, 2);
-  ct.value = "En resumen";
-  ct.font = { name:"Calibri", size:13, bold:true, color:{argb:C.blanco} };
-  ct.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde700} };
-  ct.alignment = { vertical:"middle", indent:1 };
+  ct.value = "   EN RESUMEN";
+  ct.font = { name:"Calibri", size:12.5, bold:true, color:{argb:C.tinta} };
+  ct.fill = degradado(C.mostaza, C.verde);
+  ct.alignment = { vertical:"middle" };
+  ct.border = relieve(C.mostaza, C.verde800);
   ws.getRow(fila).height = 24;
-  fila++;
-  ws.mergeCells(fila, 2, fila, 7);
+  sombra(ws, fila+1, 2, 8, 2.5);
+  fila += 2;
+
+  ws.mergeCells(fila, 2, fila, 8);
   const cc = ws.getCell(fila, 2);
   cc.value = conclusion;
-  cc.font = { name:"Calibri", size:11, color:{argb:C.tinta} };
+  cc.font = { name:"Calibri", size:10.5, color:{argb:C.tinta} };
   cc.alignment = { wrapText:true, vertical:"top", indent:1 };
-  cc.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
-  cc.border = borde(C.verde);
-  ws.getRow(fila).height = Math.max(60, Math.ceil(conclusion.length/95) * 15);
+  cc.fill = degradado(C.papel, C.papel2);
+  cc.border = { left:{style:"thick",color:{argb:C.mostaza}}, bottom:{style:"medium",color:{argb:C.linea}}, right:{style:"thin",color:{argb:C.linea}} };
+  ws.getRow(fila).height = Math.max(70, Math.ceil(conclusion.length/88) * 15 + 10);
+  fila++;
+  sombra(ws, fila, 2, 8, 3.5);
   fila += 2;
 
   const pie = ws.getCell(fila, 2);
   pie.value = "Informe generado automáticamente por la aplicación Registro de Turistas.";
-  pie.font = { name:"Calibri", size:9, italic:true, color:{argb:C.gris} };
+  pie.font = { name:"Calibri", size:8.5, italic:true, color:{argb:C.gris} };
+  ws.mergeCells(fila, 2, fila, 8);
   return ws;
 }
 
 function hojaDashboard(wb, a, nFilas) {
   const ws = wb.addWorksheet("Dashboard", { views:[{ showGridLines:false }] });
-  ws.columns = [{width:3},{width:28},{width:16},{width:16},{width:16},{width:16},{width:16}];
-  const F = nFilas + 1;   // última fila con datos en la hoja Datos
+  ws.columns = [{width:2},{width:26},{width:1.6},{width:15},{width:1.6},{width:15},{width:1.6},{width:15},{width:2}];
+  const F = nFilas + 1;
 
-  ws.mergeCells("B2:G2");
+  for (let f = 2; f <= 3; f++) for (let col = 2; col <= 8; col++) ws.getCell(f, col).fill = degradado(C.tinta, C.verde800);
+  ws.mergeCells("B2:H2");
   const t = ws.getCell("B2");
-  t.value = "Tablero de control";
-  t.font = { name:"Calibri", size:18, bold:true, color:{argb:C.blanco} };
-  t.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.tinta} };
-  t.alignment = { vertical:"middle", indent:1 };
-  ws.getRow(2).height = 32;
+  t.value = "  TABLERO DE CONTROL";
+  t.font = { name:"Calibri Light", size:20, bold:true, color:{argb:C.blanco} };
+  t.alignment = { vertical:"middle" };
+  ws.getRow(2).height = 34;
+  ws.mergeCells("B3:H3");
+  const ay = ws.getCell("B3");
+  ay.value = "  Elige un período en la casilla verde: todas las cifras de esta hoja se recalculan solas.";
+  ay.font = { name:"Calibri", size:9, italic:true, color:{argb:C.papel2} };
+  ws.getRow(3).height = 15;
+  for (let col = 2; col <= 8; col++) ws.getCell(4, col).fill = degradado(C.verde, C.mostaza, false);
+  ws.getRow(4).height = 4;
+  sombra(ws, 5, 2, 8, 4);
 
-  const ayuda = ws.getCell("B3");
-  ayuda.value = "Elige un mes en la casilla verde: todas las cifras de esta hoja se recalculan solas.";
-  ayuda.font = { name:"Calibri", size:9, italic:true, color:{argb:C.gris} };
-  ws.mergeCells("B3:G3");
-
-  // Selector de mes: validación de lista nativa de Excel.
+  // Selector con aspecto de botón: degradado y bordes de relieve.
+  const lbl = ws.getCell(7, 2);
+  lbl.value = "PERÍODO";
+  lbl.font = { name:"Calibri", size:9, bold:true, color:{argb:C.verde700} };
+  lbl.alignment = { vertical:"middle", horizontal:"right" };
   const meses = a.porMes.map(m => nombreMes(m[0]));
   const opciones = ["Toda la temporada", ...meses];
-  ws.getCell("B5").value = "Período";
-  ws.getCell("B5").font = { name:"Calibri", size:10, bold:true, color:{argb:C.verde700} };
-  const sel = ws.getCell("C5");
+  ws.mergeCells(7, 4, 7, 6);
+  const sel = ws.getCell(7, 4);
   sel.value = "Toda la temporada";
   sel.dataValidation = {
-    type: "list", allowBlank: false,
-    formulae: [`"${opciones.join(",")}"`],
-    showErrorMessage: true,
-    errorTitle: "Período no válido",
-    error: "Elige uno de los períodos de la lista.",
+    type:"list", allowBlank:false, formulae:[`"${opciones.join(",")}"`],
+    showErrorMessage:true, errorTitle:"Período no válido", error:"Elige uno de los períodos de la lista.",
   };
-  sel.font = { name:"Calibri", size:11, bold:true, color:{argb:C.tinta} };
-  sel.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde} };
-  sel.border = borde(C.verde700, "medium");
-  sel.alignment = { horizontal:"center" };
-  ws.mergeCells("C5:D5");
+  sel.font = { name:"Calibri", size:11.5, bold:true, color:{argb:C.tinta} };
+  sel.fill = degradado(C.verde, C.verde600);
+  sel.border = relieve(C.destacado, C.verde800);
+  sel.alignment = { horizontal:"center", vertical:"middle" };
+  ws.getRow(7).height = 26;
+  for (let col = 4; col <= 6; col++) ws.getCell(8, col).fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.sombra} };
+  ws.getRow(8).height = 3;
 
-  // KPIs que dependen del selector.
-  const kpi = (col, titulo, formula, fmt) => {
-    const cT = ws.getCell(7, col);
-    cT.value = titulo;
-    cT.font = { name:"Calibri", size:9, bold:true, color:{argb:C.verde700} };
-    cT.alignment = { horizontal:"center" };
-    cT.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
-    cT.border = { top:{style:"medium",color:{argb:C.verde}}, left:borde().left, right:borde().right };
-    const cV = ws.getCell(8, col);
-    cV.value = { formula };
-    cV.numFmt = fmt;
-    cV.font = { name:"Calibri", size:18, bold:true, color:{argb:C.tinta} };
-    cV.alignment = { horizontal:"center" };
-    cV.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
-    cV.border = { bottom:borde().bottom, left:borde().left, right:borde().right };
-  };
-  const todo = `$C$5="Toda la temporada"`;
-  kpi(2, "Turistas", `IF(${todo},SUM(Datos!J2:J${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!J2:J${F}))`, "#,##0");
-  kpi(3, "Atenciones", `IF(${todo},COUNTA(Datos!A2:A${F}),COUNTIF(Datos!B2:B${F},$C$5))`, "#,##0");
-  kpi(4, "Femenino", `IFERROR(IF(${todo},SUM(Datos!H2:H${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!H2:H${F}))/B8,0)`, "0.0%");
-  kpi(5, "Masculino", `IFERROR(IF(${todo},SUM(Datos!I2:I${F}),SUMIF(Datos!B2:B${F},$C$5,Datos!I2:I${F}))/B8,0)`, "0.0%");
-  kpi(6, "Grupo medio", `IFERROR(B8/C8,0)`, "0.0");
-  ws.getRow(7).height = 16;
-  ws.getRow(8).height = 28;
+  const todo = `$D$7="Toda la temporada"`;
+  const kpis = [
+    ["TURISTAS",   `IF(${todo},SUM(Datos!J2:J${F}),SUMIF(Datos!B2:B${F},$D$7,Datos!J2:J${F}))`, "#,##0", C.verde],
+    ["ATENCIONES", `IF(${todo},COUNTA(Datos!A2:A${F}),COUNTIF(Datos!B2:B${F},$D$7))`, "#,##0", C.mar],
+    ["FEMENINO",   `IFERROR(IF(${todo},SUM(Datos!H2:H${F}),SUMIF(Datos!B2:B${F},$D$7,Datos!H2:H${F}))/$B$12,0)`, "0.0%", C.mostaza],
+    ["GRUPO MEDIO",`IFERROR($B$12/$D$12,0)`, "0.0", C.verde700],
+  ];
+  kpis.forEach((k, i) => tarjetaKPI(ws, 10, 2 + i*2, k[0], { formula:k[1] }, k[2], k[3]));
 
-  // Tablas vivas: también responden al selector.
-  let fila = 10;
+  let fila = 15;
   const tablaViva = (titulo, etiquetas, colDatos) => {
-    fila = tituloSeccion(ws, fila, titulo, 4);
-    fila = encabezadoTabla(ws, fila, ["Categoría", "Turistas", "% del período", "Peso relativo"]);
+    fila = tituloSeccion(ws, fila, titulo, 2, 8);
+    fila = encabezadoTabla(ws, fila, ["Categoría", "Turistas", "% del período", "Peso relativo"], 2);
     const desde = fila;
     etiquetas.forEach((et, i) => {
-      const par = i % 2 === 0;
       const f = fila;
-      const cN = ws.getCell(f, 1); cN.value = et;
-      const cV = ws.getCell(f, 2);
-      cV.value = { formula: `IF(${todo},SUMIF(Datos!${colDatos}2:${colDatos}${F},$A${f},Datos!$J2:$J${F}),SUMIFS(Datos!$J2:$J${F},Datos!${colDatos}2:${colDatos}${F},$A${f},Datos!$B2:$B${F},$C$5))` };
-      cV.numFmt = "#,##0";
-      const cP = ws.getCell(f, 3);
-      cP.value = { formula: `IFERROR($B${f}/$B$8,0)` };
-      cP.numFmt = "0.0%";
-      const cB = ws.getCell(f, 4);
-      cB.value = { formula: `$B${f}` };
-      [cN,cV,cP,cB].forEach((c, j) => {
-        c.border = borde();
+      const par = i % 2 === 0;
+      ws.getCell(f, 2).value = et;
+      ws.getCell(f, 4).value = { formula: `IF(${todo},SUMIF(Datos!${colDatos}2:${colDatos}${F},$B${f},Datos!$J2:$J${F}),SUMIFS(Datos!$J2:$J${F},Datos!${colDatos}2:${colDatos}${F},$B${f},Datos!$B2:$B${F},$D$7))` };
+      ws.getCell(f, 4).numFmt = "#,##0";
+      ws.getCell(f, 6).value = { formula: `IFERROR($D${f}/$B$12,0)` };
+      ws.getCell(f, 6).numFmt = "0.0%";
+      ws.getCell(f, 8).value = { formula: `$D${f}` };
+      [2,4,6,8].forEach((col, j) => {
+        const c = ws.getCell(f, col);
+        c.border = { top:{style:"hair",color:{argb:C.blanco}}, bottom:{style:"hair",color:{argb:C.linea}},
+                     left:{style:"hair",color:{argb:C.linea}}, right:{style:"hair",color:{argb:C.linea}} };
         c.fill = { type:"pattern", pattern:"solid", fgColor:{argb: par ? C.blanco : C.papel} };
         c.font = { name:"Calibri", size:10, color:{argb: j===3 ? (par?C.blanco:C.papel) : C.tinta} };
-        if (j === 0) c.alignment = { indent:1 };
-        if (j > 0 && j < 3) c.alignment = { horizontal:"center" };
+        if (j === 0) c.alignment = { indent:1, vertical:"middle" };
+        else c.alignment = { horizontal:"center", vertical:"middle" };
       });
+      // Las columnas estrechas intermedias siguen el color de la fila.
+      [3,5,7].forEach(col => {
+        ws.getCell(f, col).fill = { type:"pattern", pattern:"solid", fgColor:{argb: par ? C.blanco : C.papel} };
+      });
+      ws.getRow(f).height = 17;
       fila++;
     });
     ws.addConditionalFormatting({
-      ref: `D${desde}:D${fila-1}`,
-      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde600}, gradient:false }],
+      ref: `H${desde}:H${fila-1}`,
+      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde600}, gradient:true }],
     });
-    fila += 1;
+    sombra(ws, fila, 2, 8, 3);
+    fila += 2;
   };
 
-  tablaViva("Afluencia por día de la semana", DIAS, "C");
-  tablaViva("Origen del visitante", a.porRegion.slice(0, 10).map(r=>r[0]), "E");
-  tablaViva("Motivo del viaje", a.porMotivo.slice(0, 8).map(r=>r[0]), "P");
+  tablaViva("AFLUENCIA POR DÍA DE LA SEMANA", DIAS, "C");
+  tablaViva("ORIGEN DEL VISITANTE", a.porRegion.slice(0, 10).map(r=>r[0]), "E");
+  tablaViva("MOTIVO DEL VIAJE", a.porMotivo.slice(0, 8).map(r=>r[0]), "P");
   return ws;
 }
 
 function hojaAnalisis(wb, a) {
   const ws = wb.addWorksheet("Análisis", { views:[{ showGridLines:false }] });
-  ws.columns = [{width:34},{width:14},{width:14},{width:16},{width:14}];
-  let fila = 1;
+  ws.columns = [{width:34},{width:13},{width:14},{width:18},{width:3}];
+  for (let col = 1; col <= 4; col++) ws.getCell(1, col).fill = degradado(C.tinta, C.verde800);
   ws.mergeCells("A1:D1");
   const t = ws.getCell("A1");
-  t.value = "Análisis por dimensión";
-  t.font = { name:"Calibri", size:16, bold:true, color:{argb:C.blanco} };
-  t.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.tinta} };
-  t.alignment = { vertical:"middle", indent:1 };
-  ws.getRow(1).height = 28;
-  fila = 3;
-  fila = tablaRanking(ws, fila, "Turistas por mes", a.porMesTop.map(m=>[nombreMes(m[0]), m[1]]), a.turistas, "de los turistas");
-  fila = tablaRanking(ws, fila, "Turistas por día de la semana", a.porDiaSemanaTop, a.turistas, "de los turistas", 7);
-  fila = tablaRanking(ws, fila, "Fechas de mayor afluencia", a.porFecha.slice(0,10).map(f=>[fechaLarga(f[0]), f[1]]), a.turistas, "de los turistas", 10);
-  fila = tablaRanking(ws, fila, "Composición por edad", a.edadesTop, a.turistas, "de los turistas", 5);
-  fila = tablaRanking(ws, fila, "Origen del visitante", a.porRegion, a.n, "de los registros");
-  fila = tablaRanking(ws, fila, "Comunas y países de procedencia", a.porProcedencia, a.n, "de los registros", 15);
-  fila = tablaRanking(ws, fila, "Motivo del viaje", a.porMotivo, a.n, "de los registros", 10);
-  fila = tablaRanking(ws, fila, "Atractivos más consultados", a.atractivos, a.n, "de los registros", 15);
-  fila = tablaRanking(ws, fila, "Servicios más requeridos", a.servicios, a.n, "de los registros", 15);
-  if (a.informadores.length) fila = tablaRanking(ws, fila, "Registros por informador", a.informadores, a.n, "de los registros", 10);
+  t.value = "  ANÁLISIS POR DIMENSIÓN";
+  t.font = { name:"Calibri Light", size:17, bold:true, color:{argb:C.blanco} };
+  t.alignment = { vertical:"middle" };
+  ws.getRow(1).height = 30;
+  for (let col = 1; col <= 4; col++) ws.getCell(2, col).fill = degradado(C.verde, C.mostaza, false);
+  ws.getRow(2).height = 4;
+  sombra(ws, 3, 1, 4, 4);
+
+  let fila = 5;
+  fila = tablaRanking(ws, fila, "TURISTAS POR MES", a.porMesTop.map(m=>[nombreMes(m[0]), m[1]]), a.turistas, "de los turistas");
+  fila = tablaRanking(ws, fila, "TURISTAS POR DÍA DE LA SEMANA", a.porDiaSemanaTop, a.turistas, "de los turistas", 7);
+  fila = tablaRanking(ws, fila, "FECHAS DE MAYOR AFLUENCIA", a.porFecha.slice(0,10).map(f=>[fechaLarga(f[0]), f[1]]), a.turistas, "de los turistas", 10);
+  fila = tablaRanking(ws, fila, "COMPOSICIÓN POR EDAD", a.edadesTop, a.turistas, "de los turistas", 5);
+  fila = tablaRanking(ws, fila, "ORIGEN DEL VISITANTE", a.porRegion, a.n, "de los registros");
+  fila = tablaRanking(ws, fila, "COMUNAS Y PAÍSES DE PROCEDENCIA", a.porProcedencia, a.n, "de los registros", 15);
+  fila = tablaRanking(ws, fila, "MOTIVO DEL VIAJE", a.porMotivo, a.n, "de los registros", 10);
+  fila = tablaRanking(ws, fila, "ATRACTIVOS MÁS CONSULTADOS", a.atractivos, a.n, "de los registros", 15);
+  fila = tablaRanking(ws, fila, "SERVICIOS MÁS REQUERIDOS", a.servicios, a.n, "de los registros", 15);
+  if (a.informadores.length) fila = tablaRanking(ws, fila, "REGISTROS POR INFORMADOR", a.informadores, a.n, "de los registros", 10);
   return ws;
 }
 
 function hojaDatos(wb, records) {
   const ws = wb.addWorksheet("Datos", { views:[{ state:"frozen", ySplit:1 }] });
   const cols = [
-    ["Fecha", 12], ["Mes", 10], ["Día", 12], ["País", 16], ["Región", 22], ["Procedencia", 20],
+    ["Fecha", 12], ["Mes", 15], ["Día", 12], ["País", 16], ["Región", 22], ["Procedencia", 20],
     ["Informador", 18], ["Femenino", 10], ["Masculino", 10], ["Total", 8],
     ["Menor de 18", 12], ["18 a 29", 10], ["30 a 40", 10], ["41 a 50", 10], ["Mayor de 50", 12],
     ["Motivo", 26], ["Atractivos", 40], ["Servicios", 40],
@@ -546,11 +623,12 @@ function hojaDatos(wb, records) {
     const cell = ws.getCell(1, i+1);
     cell.value = c[0];
     cell.font = { name:"Calibri", size:10, bold:true, color:{argb:C.blanco} };
-    cell.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.verde800} };
+    cell.fill = degradado(C.tinta, C.verde800);
     cell.alignment = { vertical:"middle", horizontal:"center" };
-    cell.border = borde(C.verde800);
+    cell.border = { top:{style:"thin",color:{argb:C.verde600}}, bottom:{style:"medium",color:{argb:C.tinta}},
+                    left:{style:"thin",color:{argb:C.verde800}}, right:{style:"thin",color:{argb:C.verde800}} };
   });
-  ws.getRow(1).height = 20;
+  ws.getRow(1).height = 24;
 
   records.forEach((r, i) => {
     const f = i + 2;
@@ -564,18 +642,19 @@ function hojaDatos(wb, records) {
     fila.forEach((v, j) => {
       const c = ws.getCell(f, j+1);
       c.value = v;
-      c.font = { name:"Calibri", size:10, color:{argb:C.tinta} };
-      c.border = borde();
-      if (i % 2) c.fill = { type:"pattern", pattern:"solid", fgColor:{argb:C.papel} };
+      c.font = { name:"Calibri", size:9.5, color:{argb:C.tinta} };
+      c.border = { bottom:{style:"hair",color:{argb:C.linea}}, right:{style:"hair",color:{argb:C.linea}} };
+      c.fill = { type:"pattern", pattern:"solid", fgColor:{argb: i % 2 ? C.papel : C.blanco} };
       if (j >= 7 && j <= 14) { c.numFmt = "#,##0"; c.alignment = { horizontal:"center" }; }
+      if (j === 9) c.font = { name:"Calibri", size:9.5, bold:true, color:{argb:C.verde800} };
     });
+    ws.getRow(f).height = 15;
   });
   ws.autoFilter = { from:{row:1,column:1}, to:{row:records.length+1, column:cols.length} };
-  // El total destaca sobre el resto: es la columna que más se mira.
   if (records.length) {
     ws.addConditionalFormatting({
       ref: `J2:J${records.length+1}`,
-      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde}, gradient:false }],
+      rules: [{ type:"dataBar", cfvo:[{type:"min"},{type:"max"}], color:{argb:C.verde}, gradient:true }],
     });
   }
   return ws;

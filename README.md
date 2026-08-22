@@ -241,6 +241,27 @@ revisar es si la URL de Chart.js en `index.html` sigue siendo válida.
   Se agregó `overrides.uuid` en `package.json` porque ExcelJS arrastra un uuid
   con una vulnerabilidad moderada que `npm audit fix` no resolvía solo.
 
+  **(2026-08-21, segunda pasada) Profundidad visual.** Julio pidió nivel de
+  gerencia general: relieve, tridimensionalidad. En Excel las celdas no tienen
+  sombra ni elevación, así que se consigue combinando tres recursos que sí son
+  nativos: **degradados de relleno** (`fill: {type:"gradient"}`), **bordes
+  asimétricos** —claro arriba/izquierda, oscuro abajo/derecha, que es como el
+  ojo lee una superficie elevada— y una **fila delgada de gris bajo cada
+  bloque** que funciona como sombra proyectada (`sombra()`).
+
+  Las cifras de portada son tarjetas de cuatro filas (`tarjetaKPI()`): banda de
+  acento, título, valor y sombra, cada una con su color. El selector del tablero
+  usa el mismo relieve para leerse como un botón.
+
+  **Verificado con `recalc.py` de la habilidad `xlsx`: 0 errores en 79
+  fórmulas.** El script busca `soffice` en el PATH; en este equipo hay que
+  anteponer `/Applications/LibreOffice.app/Contents/MacOS`.
+
+  Cuidado con el alto de las filas de texto: se calcula estimando caracteres por
+  línea, y si se subestima **Excel corta el último renglón sin avisar**. Pasó
+  con `/108`; el ancho real da unos 88 caracteres. Esto no se ve en el código:
+  hay que convertir el archivo a PDF y mirarlo.
+
 - **(2026-08-21) El Historial se agrupa por mes y día**, pedido de Julio: la
   lista corrida era imposible de recorrer con una temporada completa encima, y
   la lista de 92 días tampoco.
